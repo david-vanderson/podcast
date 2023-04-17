@@ -1,0 +1,9 @@
+[submodule "libs/mach-freetype"]
+	path = libs/mach-freetype
+	url = https://github.com/hexops/mach-freetype.git
+[submodule "libs/zig-sqlite"]
+	path = libs/zig-sqlite
+	url = https://github.com/vrischmann/zig-sqlite
+[submodule "libs/zig-libxml2"]
+	path = libs/zig-libxml2
+	url = https://github.com/mitchellh/zig-libxml2

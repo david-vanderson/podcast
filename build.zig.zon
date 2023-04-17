@@ -1,0 +1,18 @@
+.{
+    .name = "podcast",
+    .version = "0.0.1",
+    .dependencies = .{
+        .gui = .{
+            .url = "https://github.com/david-vanderson/gui/archive/1882fa605799528a0ebd8f69d1f47b450a9b2884.tar.gz",
+            .hash = "122043b2192c1b2a25245a0664ee1b65f81efc00273736411d5ff08919883540ed8c",
+        },
+        .ffmpeg = .{
+            .url = "https://github.com/andrewrk/ffmpeg/archive/3ed831f2ff78252d51685a7cd07782020e09fb24.tar.gz",
+            .hash = "1220a5f11188b28c024e4711d8a67a580d61e5e78b81bbb5bdac566db86ea4bbaedf",
+        },
+        .curl = .{
+            .url = "https://github.com/david-vanderson/curl/archive/eaa13cf0c19dad01bc6b0d907d9beaa5f2f983ba.tar.gz",
+            .hash = "12203a4e1ac1e365b69a3fe710fdb2fcae1489d57d4a06caa7c8a5f3d4658bac8e84",
+        },
+    },
+}

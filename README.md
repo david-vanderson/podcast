@@ -1,2 +1,2 @@
-# podcast
-podcast player in zig
+# Podcast
+Podcast player in zig.
