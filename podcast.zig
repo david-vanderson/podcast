@@ -626,8 +626,8 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                         while (try iter.nextAlloc(arena, .{})) |rowid| {
                             bgtask_mutex.lock();
                             try bgtasks.append(.{ .kind = .update_feed, .rowid = @intCast(u32, rowid) });
-                            bgtask_condition.signal();
                             bgtask_mutex.unlock();
+                            bgtask_condition.signal();
                         }
                     }
                 }
@@ -670,8 +670,8 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                     const rowid = db.getLastInsertRowID();
                     bgtask_mutex.lock();
                     try bgtasks.append(.{ .kind = .update_feed, .rowid = @intCast(u32, rowid) });
-                    bgtask_condition.signal();
                     bgtask_mutex.unlock();
+                    bgtask_condition.signal();
                 }
             }
         }
@@ -826,8 +826,8 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                         if (!playing) {
                             play();
                         }
-                        audio_condition.signal();
                         audio_mutex.unlock();
+                        audio_condition.signal();
                     }
                 }
 
