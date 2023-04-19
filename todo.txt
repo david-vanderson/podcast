@@ -10,10 +10,6 @@ progress bar for downloading
 need image support for thumbnails
 - zigimg?  stb_image?
 
-play/pause takes a second or two to happen
- - try compiling in release mode?
- - maybe see if compiling against static SDL fixes it?
-
 add playback speed adjusting (via ffmpeg atempo filter)
  - if playback is too fast (2x?) need to run through the filter multiple times
 
