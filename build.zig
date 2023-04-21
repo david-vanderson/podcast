@@ -4,7 +4,7 @@ const std = @import("std");
 //const libssh2 = @import("libs/zig-libssh2/libssh2.zig");
 //const libcurl = @import("libs/zig-libcurl/libcurl.zig");
 //const libzlib = @import("libs/zig-zlib/zlib.zig");
-const libxml2 = @import("libs/zig-libxml2/libxml2.zig");
+//const libxml2 = @import("libs/zig-libxml2/libxml2.zig");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -56,16 +56,21 @@ pub fn build(b: *std.Build) !void {
     //ssh2.link(curl.step);
     //curl.link(exe, .{ .import_name = "curl" });
 
-    const libxml = try libxml2.create(b, target, optimize, .{
-        .iconv = false,
-        .lzma = false,
-        .zlib = true,
-    });
+    //const libxml = try libxml2.create(b, target, optimize, .{
+    //    .iconv = false,
+    //    .lzma = false,
+    //    .zlib = true,
+    //});
 
-    libxml.link(exe);
+    //libxml.link(exe);
 
     const ffmpeg_dep = b.dependency("ffmpeg", .{ .target = target, .optimize = optimize });
     exe.linkLibrary(ffmpeg_dep.artifact("ffmpeg"));
+
+    const libxml2_dep = b.dependency("libxml2", .{ .target = target, .optimize = optimize });
+    exe.linkLibrary(libxml2_dep.artifact("xml2"));
+    //exe.addObjectFile("../libxml2/zig-out/lib/libxml2.a");
+    //exe.addIncludePath("../libxml2/zig-out/include");
 
     //if (target.isDarwin()) {
     //    exe.linkSystemLibrary("z");

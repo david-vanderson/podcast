@@ -14,5 +14,9 @@
             .url = "https://github.com/david-vanderson/curl/archive/eaa13cf0c19dad01bc6b0d907d9beaa5f2f983ba.tar.gz",
             .hash = "12203a4e1ac1e365b69a3fe710fdb2fcae1489d57d4a06caa7c8a5f3d4658bac8e84",
         },
+        .libxml2 = .{
+            .url = "https://github.com/david-vanderson/libxml2/archive/1d0b1e46d159f7413cd1d2e7a41be47162e8ecf6.tar.gz",
+            .hash = "1220ff90671fc0d2e3cf7c97626dc1133f18e4fc47143c60bd57177196efb9ba7477",
+        },
     },
 }

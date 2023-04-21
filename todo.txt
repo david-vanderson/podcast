@@ -1,4 +1,6 @@
 
+need to sort episode list by date
+
 replace zig-libxml2 with zig dependency
 
 can zig-sqlite be used as a zig dependency?
