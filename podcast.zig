@@ -788,9 +788,15 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
         const num_episodes = try dbRow(arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", usize, .{g_podcast_id_on_right}) orelse 0;
         const height: f32 = 150;
 
-        var scroll_info: gui.ScrollInfo = .{ .vertical = .given, .virtual_size = .{ .h = height * @intToFloat(f32, num_episodes) } };
+        const tmpId = gui.parentGet().extendId(@src(), 0);
+        var scroll_info: gui.ScrollInfo = .{ .vertical = .given };
+        if (gui.dataGet(null, tmpId, "scroll_info", gui.ScrollInfo)) |si| {
+            scroll_info = si;
+            scroll_info.virtual_size.h = height * @intToFloat(f32, num_episodes);
+        }
+        defer gui.dataSet(null, tmpId, "scroll_info", scroll_info);
+
         var scroll = try gui.scrollArea(@src(), .{ .scroll_info = &scroll_info }, .{ .expand = .both, .background = false });
-        //scroll.setVirtualSize(.{ .w = 0, .h = height * @intToFloat(f32, num_episodes) });
         defer scroll.deinit();
 
         var stmt = db.prepare(Episode.query_all) catch {
@@ -977,7 +983,7 @@ fn player(arena: std.mem.Allocator) !void {
     }
 
     if (playing) {
-        const timerId = gui.parentGet().extendID(@src(), 0);
+        const timerId = gui.parentGet().extendId(@src(), 0);
         const millis = @divFloor(gui.frameTimeNS(), 1_000_000);
         const left = @intCast(i32, @rem(millis, 1000));
 
