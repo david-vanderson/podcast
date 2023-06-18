@@ -53,10 +53,11 @@ const Task = struct {
 };
 
 const Episode = struct {
-    const query_base = "SELECT rowid, title, description, enclosure_url, position, duration FROM episode";
+    const query_base = "SELECT rowid, podcast_id, title, description, enclosure_url, position, duration FROM episode";
     const query_one = query_base ++ " WHERE rowid = ?";
     const query_all = query_base ++ " WHERE podcast_id = ?";
     rowid: usize,
+    podcast_id: usize,
     title: []const u8,
     description: []const u8,
     enclosure_url: []const u8,
@@ -668,7 +669,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
             if (row) |_| {
                 try gui.dialog(@src(), .{ .title = "Note", .message = try std.fmt.allocPrint(arena, "url already in db:\n\n{s}", .{url}) });
             } else {
-                _ = try dbRow(arena, "INSERT INTO podcast (url) VALUES (?)", i32, .{url});
+                _ = try dbRow(arena, "INSERT INTO podcast (url, speed) VALUES (?, 1.0)", i32, .{url});
                 if (g_db) |*db| {
                     const rowid = db.getLastInsertRowID();
                     bgtask_mutex.lock();
@@ -894,7 +895,7 @@ fn player(arena: std.mem.Allocator) !void {
     var box = try gui.box(@src(), .vertical, .{ .expand = .horizontal, .color_style = .content, .background = true });
     defer box.deinit();
 
-    var episode = Episode{ .rowid = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0 };
+    var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0 };
 
     const episode_id = try dbRow(arena, "SELECT episode_id FROM player", i32, .{});
     if (episode_id) |id| {
@@ -906,6 +907,37 @@ fn player(arena: std.mem.Allocator) !void {
         .margin = gui.Rect{ .x = 8, .y = 4, .w = 8, .h = 4 },
         .font_style = .heading,
     });
+
+    {
+        var box3 = try gui.box(@src(), .horizontal, .{ .expand = .horizontal, .padding = .{ .x = 4, .y = 4, .w = 4, .h = 4 } });
+        defer box3.deinit();
+
+        var speed: f32 = 1.0;
+        if (episode_id) |_| {
+            speed = try dbRow(arena, "SELECT speed FROM podcast WHERE rowid = ?", f32, .{episode.podcast_id}) orelse 1.0;
+            if (speed == 0) speed = 1.0;
+        }
+
+        try gui.label(@src(), "{d:.2}", .{speed}, .{});
+
+        if (try gui.button(@src(), "speed up", .{})) {
+            speed += 0.1;
+            speed = @min(3.0, speed);
+            _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+            audio_mutex.lock();
+            current_speed = speed;
+            audio_mutex.unlock();
+        }
+
+        if (try gui.button(@src(), "speed down", .{})) {
+            speed -= 0.1;
+            speed = @max(0.1, speed);
+            _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+            audio_mutex.lock();
+            current_speed = speed;
+            audio_mutex.unlock();
+        }
+    }
 
     audio_mutex.lock();
 
@@ -1008,6 +1040,7 @@ var buffer_eof = false;
 var stream_timebase: f64 = 1.0;
 var buffer_last_time: f64 = 0;
 var current_time: f64 = 0;
+var current_speed: f32 = 1.0;
 
 // must hold audio_mutex when calling this
 fn play() void {

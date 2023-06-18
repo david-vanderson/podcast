@@ -1,7 +1,10 @@
 
-need to sort episode list by date
+add playback speed adjusting (via ffmpeg atempo filter)
+ - if playback is too fast (2x?) need to run through the filter multiple times
 
-replace zig-libxml2 with zig dependency
+need to properly support stereo audio
+
+need to sort episode list by date
 
 can zig-sqlite be used as a zig dependency?
 
@@ -11,7 +14,4 @@ progress bar for downloading
 
 need image support for thumbnails
 - zigimg?  stb_image?
-
-add playback speed adjusting (via ffmpeg atempo filter)
- - if playback is too fast (2x?) need to run through the filter multiple times
 
