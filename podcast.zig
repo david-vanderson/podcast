@@ -931,7 +931,7 @@ fn player(arena: std.mem.Allocator) !void {
 
         if (try gui.button(@src(), "speed down", .{})) {
             speed -= 0.1;
-            speed = @max(0.1, speed);
+            speed = @max(0.5, speed);
             _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
         }
 
@@ -1085,7 +1085,7 @@ export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) 
     defer audio_mutex.unlock();
 
     while (i < len and buffer.readableLength() > 0) {
-        const size = std.math.min(len - i, buffer.readableLength());
+        const size = std.math.min(len - i, buffer.readableSlice(0).len);
         for (buffer.readableSlice(0)[0..size]) |s| {
             stream[i] = s;
             i += 1;

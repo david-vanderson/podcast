@@ -1,8 +1,5 @@
 
-add playback speed adjusting (via ffmpeg atempo filter)
- - if playback is too fast (2x?) need to run through the filter multiple times
-
-need to properly support stereo audio
+store current position for each episode
 
 need to sort episode list by date
 
