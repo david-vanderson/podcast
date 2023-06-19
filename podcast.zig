@@ -20,7 +20,10 @@ pub const c = @cImport({
 
     @cInclude("libavformat/avformat.h");
     @cInclude("libavcodec/avcodec.h");
-    @cInclude("libswresample/swresample.h");
+    @cInclude("libavfilter/avfilter.h");
+    @cInclude("libavfilter/buffersink.h");
+    @cInclude("libavfilter/buffersrc.h");
+    @cInclude("libavutil/opt.h");
 });
 
 // when set to true, looks for feed-{rowid}.xml and episode-{rowid}.mp3 instead
@@ -924,19 +927,25 @@ fn player(arena: std.mem.Allocator) !void {
             speed += 0.1;
             speed = @min(3.0, speed);
             _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
-            audio_mutex.lock();
-            current_speed = speed;
-            audio_mutex.unlock();
         }
 
         if (try gui.button(@src(), "speed down", .{})) {
             speed -= 0.1;
             speed = @max(0.1, speed);
             _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
-            audio_mutex.lock();
-            current_speed = speed;
-            audio_mutex.unlock();
         }
+
+        audio_mutex.lock();
+        if (current_speed != speed) {
+            current_speed = speed;
+            std.debug.print("setting speed {d}\n", .{current_speed});
+            stream_seek_time = std.math.max(0.0, current_time - 1.0);
+            buffer.discard(buffer.readableLength());
+            buffer_last_time = stream_seek_time.?;
+            current_time = stream_seek_time.?;
+            audio_condition.signal();
+        }
+        audio_mutex.unlock();
     }
 
     audio_mutex.lock();
@@ -1212,15 +1221,20 @@ fn playback_thread() !void {
 
         var frame: *c.AVFrame = c.av_frame_alloc();
         defer c.av_frame_free(@ptrCast([*c][*c]c.AVFrame, &frame));
+        var outframe: *c.AVFrame = c.av_frame_alloc();
+        defer c.av_frame_free(@ptrCast([*c][*c]c.AVFrame, &outframe));
         var pkt: *c.AVPacket = c.av_packet_alloc();
-        var swrctx: ?*c.SwrContext = null;
+        var graph: ?*c.AVFilterGraph = null;
+        var graph_src: ?*c.AVFilterContext = null;
+        var graph_sink: ?*c.AVFilterContext = null;
 
         seek: while (true) {
             defer {
                 c.avcodec_flush_buffers(avctx);
-                if (swrctx != null) {
-                    c.swr_free(&swrctx);
-                    swrctx = null;
+
+                if (graph != null) {
+                    c.avfilter_graph_free(&graph);
+                    graph = null;
                 }
             }
 
@@ -1242,22 +1256,23 @@ fn playback_thread() !void {
                 }
             }
 
-            var draining = false;
+            var eof_file = false;
             while (true) {
                 // checkout av_read_pause and av_read_play if doing a network stream
 
-                if (!draining) {
+                if (!eof_file) {
                     err = c.av_read_frame(avfc, pkt);
+                    defer c.av_packet_unref(pkt);
                     if (err == c.AVERROR_EOF) {
-                        //std.debug.print("read_frame eof\n", .{});
-                        draining = true;
+                        std.debug.print("read_frame eof\n", .{});
+                        eof_file = true;
                     } else if (err != 0) {
                         _ = c.av_strerror(err, &buf, 256);
                         std.debug.print("read_frame err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
                         return;
                     }
 
-                    err = c.avcodec_send_packet(avctx, if (draining) null else pkt);
+                    err = c.avcodec_send_packet(avctx, if (eof_file) null else pkt);
                     // could return eagain if codec is full, have to call receive_frame to proceed
                     if (err == c.AVERROR(c.EAGAIN)) {
                         std.debug.print("avcodec_send_packet eagain\n", .{});
@@ -1268,18 +1283,29 @@ fn playback_thread() !void {
                         // TODO: count number of sequential errors and bail if too many
                         continue;
                     }
-
-                    if (!draining) {
-                        c.av_packet_unref(pkt);
-                    }
                 }
 
-                var eof = false;
                 var ret = c.avcodec_receive_frame(avctx, frame);
                 // could return eagain if codec is empty, have to call send_packet to proceed
                 if (ret == c.AVERROR_EOF) {
-                    //std.debug.print("receive_frame eof\n", .{});
-                    eof = true;
+                    std.debug.print("receive_frame eof\n", .{});
+
+                    audio_mutex.lock();
+                    defer audio_mutex.unlock();
+                    // signal audio_callback to pause when it runs out of samples
+                    buffer_eof = true;
+
+                    while (true) {
+                        audio_condition.wait(&audio_mutex);
+
+                        if (stream_new) {
+                            continue :stream;
+                        }
+
+                        if (stream_seek_time != null) {
+                            continue :seek;
+                        }
+                    }
                 } else if (ret == c.AVERROR(c.EAGAIN)) {
                     //std.debug.print("receive_frame eagain\n", .{});
                     continue;
@@ -1289,32 +1315,92 @@ fn playback_thread() !void {
                     return;
                 }
 
-                // only used if we are in eof and flushing the last samples out of swr_convert
-                var out_samples: c_int = 256;
+                if (graph == null) {
+                    graph = c.avfilter_graph_alloc();
 
-                if (!eof and swrctx == null) {
-                    err = c.swr_alloc_set_opts2(&swrctx, &target_ch_layout, c.AV_SAMPLE_FMT_S16, audio_spec.freq, &frame.*.ch_layout, frame.*.format, frame.*.sample_rate, 0, null);
+                    var ch_layout: [64]u8 = undefined;
+                    _ = c.av_channel_layout_describe(&avctx.ch_layout, &ch_layout, ch_layout.len);
+                    const asrc_args = try std.fmt.bufPrintZ(&buf, "sample_rate={d}:sample_fmt={s}:time_base=1/{d}:channel_layout={s}", .{ frame.sample_rate, c.av_get_sample_fmt_name(frame.*.format), frame.sample_rate, ch_layout });
+
+                    err = c.avfilter_graph_create_filter(&graph_src, c.avfilter_get_by_name("abuffer"), "in", asrc_args, null, graph);
                     if (err != 0) {
                         _ = c.av_strerror(err, &buf, 256);
-                        std.debug.print("swr_alloc_set_opts2 err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                        std.debug.print("graph_src init err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
                         return;
                     }
 
-                    err = c.swr_init(swrctx);
+                    err = c.avfilter_graph_create_filter(&graph_sink, c.avfilter_get_by_name("abuffersink"), "out", null, null, graph);
                     if (err != 0) {
                         _ = c.av_strerror(err, &buf, 256);
-                        std.debug.print("swr_init err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                        std.debug.print("graph_sink init err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
                         return;
                     }
+
+                    var outputs: ?*c.AVFilterInOut = c.avfilter_inout_alloc();
+                    outputs.?.name = c.av_strdup("in");
+                    outputs.?.filter_ctx = graph_src;
+                    outputs.?.pad_idx = 0;
+                    outputs.?.next = null;
+
+                    var inputs: ?*c.AVFilterInOut = c.avfilter_inout_alloc();
+                    inputs.?.name = c.av_strdup("out");
+                    inputs.?.filter_ctx = graph_sink;
+                    inputs.?.pad_idx = 0;
+                    inputs.?.next = null;
+
+                    audio_mutex.lock();
+                    const filtergraph = try std.fmt.bufPrintZ(&buf, "aresample={d},aformat=sample_fmts={s}:channel_layouts={s},atempo={d}", .{ audio_spec.freq, "s16", "stereo", current_speed });
+                    audio_mutex.unlock();
+                    std.debug.print("filtergraph {s}\n", .{filtergraph});
+
+                    err = c.avfilter_graph_parse_ptr(graph, filtergraph, &inputs, &outputs, null);
+                    if (err < 0) {
+                        _ = c.av_strerror(err, &buf, 256);
+                        std.debug.print("Error avfilter_graph_parse_ptr {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                        return;
+                    }
+
+                    err = c.avfilter_graph_config(graph, null);
+                    if (err < 0) {
+                        _ = c.av_strerror(err, &buf, 256);
+                        std.debug.print("Error configuring the filter graph {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                        return;
+                    }
+
+                    var dump = c.avfilter_graph_dump(graph, null);
+                    std.debug.print("graph: \n{s}\n", .{dump});
+
+                    c.avfilter_inout_free(&outputs);
+                    c.avfilter_inout_free(&inputs);
                 }
 
-                if (!eof) {
-                    out_samples = @divTrunc(frame.*.nb_samples * audio_spec.freq, frame.*.sample_rate) + 256;
+                err = c.av_buffersrc_add_frame(graph_src, frame);
+                if (err < 0) {
+                    _ = c.av_strerror(err, &buf, 256);
+                    std.debug.print("Error adding frame to graph_src {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                    return;
                 }
 
-                const data_size = @intCast(usize, out_samples * 2 * 2); // 2 bytes per sample per channel
+                c.av_frame_unref(frame);
 
-                if (swrctx != null) {
+                while (true) {
+                    err = c.av_buffersink_get_frame(graph_sink, outframe);
+                    if (err == c.AVERROR_EOF) {
+                        std.debug.print("graph_sink eof\n", .{});
+                        break;
+                    } else if (err == c.AVERROR(c.EAGAIN)) {
+                        //std.debug.print("graph_sink again\n", .{});
+                        break;
+                    } else if (err < 0) {
+                        _ = c.av_strerror(err, &buf, 256);
+                        std.debug.print("graph_sink err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
+                        return;
+                    }
+
+                    defer c.av_frame_unref(outframe);
+
+                    const data_size = @intCast(usize, outframe.nb_samples * 2 * 2); // 2 bytes per sample per channel
+
                     audio_mutex.lock();
                     defer audio_mutex.unlock();
 
@@ -1331,50 +1417,13 @@ fn playback_thread() !void {
                     }
 
                     var slice = buffer.writableWithSize(data_size) catch unreachable;
-                    err = c.swr_convert(
-                        swrctx,
-                        @ptrCast([*c][*c]u8, &slice.ptr),
-                        out_samples,
-                        if (eof) null else &frame.*.data[0],
-                        if (eof) 0 else frame.*.nb_samples,
-                    );
-                    if (err < 0) {
-                        _ = c.av_strerror(err, &buf, 256);
-                        std.debug.print("swr_convert err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
-                        return;
+                    for (0..data_size) |i| {
+                        slice[i] = outframe.data[0][i];
                     }
+                    buffer.update(data_size);
+                    const seconds_written = @intToFloat(f64, outframe.nb_samples) / @intToFloat(f64, audio_spec.freq);
 
-                    const data_written = @intCast(usize, err * 2 * 2); // 2 bytes per sample per channel
-                    buffer.update(data_written);
-                    const seconds_written = @intToFloat(f64, err) / @intToFloat(f64, audio_spec.freq);
-
-                    if (!eof) {
-                        buffer_last_time = @intToFloat(f64, frame.*.best_effort_timestamp) * stream_timebase + seconds_written;
-                    } else {
-                        buffer_last_time += seconds_written;
-                    }
-
-                    //std.debug.print("ts: {d}\n", .{buffer_last_time});
-
-                    //std.debug.print(".", .{});
-                    //std.debug.print("|{d}", .{err});
-                    if (eof) {
-                        // signal audio_callback to pause when it runs out of samples
-                        //std.debug.print("buffer_eof\n", .{});
-                        buffer_eof = true;
-
-                        while (true) {
-                            audio_condition.wait(&audio_mutex);
-
-                            if (stream_new) {
-                                continue :stream;
-                            }
-
-                            if (stream_seek_time != null) {
-                                continue :seek;
-                            }
-                        }
-                    }
+                    buffer_last_time = @intToFloat(f64, outframe.*.best_effort_timestamp) * stream_timebase + seconds_written;
                 }
             }
         }
