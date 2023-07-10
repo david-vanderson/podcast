@@ -289,13 +289,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
             fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
                 _ = size;
                 var slice = (ptr orelse return 0)[0..nmemb];
-                const fifo = @ptrCast(
-                    *Fifo,
-                    @alignCast(
-                        @alignOf(*Fifo),
-                        data orelse return 0,
-                    ),
-                );
+                const fifo: *Fifo = @ptrCast(@alignCast(data orelse return 0));
 
                 fifo.writer().writeAll(slice) catch return 0;
                 return nmemb;
@@ -462,7 +456,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
                     const mins = std.fmt.parseInt(u32, it.next() orelse "0", 10) catch 0;
                     const hrs = std.fmt.parseInt(u32, it.next() orelse "0", 10) catch 0;
 
-                    const dur = @intToFloat(f64, secs) + 60.0 * @intToFloat(f64, mins) + 60.0 * 60.0 * @intToFloat(f64, hrs);
+                    const dur = @as(f64, @floatFromInt(secs)) + 60.0 * @as(f64, @floatFromInt(mins)) + 60.0 * 60.0 * @as(f64, @floatFromInt(hrs));
 
                     _ = try dbRow(arena, "UPDATE episode SET duration=? WHERE rowid=?", i32, .{ dur, erow });
                 }
@@ -578,7 +572,7 @@ pub fn main() !void {
             else => return err,
         };
 
-        const end_micros = try g_win.end();
+        const end_micros = try g_win.end(.{});
 
         backend.setCursor(g_win.cursorRequested());
 
@@ -606,16 +600,16 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
 
             _ = gui.spacer(@src(), .{}, .{ .expand = .horizontal });
 
-            if (try gui.menuItemIcon(@src(), true, "toolbar dots", gui.icons.papirus.actions.xapp_prefs_toolbar_symbolic, .{ .expand = .none })) |r| {
+            if (try gui.menuItemIcon(@src(), "toolbar dots", gui.icons.papirus.actions.xapp_prefs_toolbar_symbolic, .{ .submenu = true }, .{ .expand = .none })) |r| {
                 var fw = try gui.popup(@src(), gui.Rect.fromPoint(gui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
-                if (try gui.menuItemLabel(@src(), "Add RSS", false, .{})) |rr| {
+                if (try gui.menuItemLabel(@src(), "Add RSS", .{}, .{})) |rr| {
                     _ = rr;
                     gui.menuGet().?.close();
                     add_rss_dialog = true;
                 }
 
-                if (try gui.menuItemLabel(@src(), "Update All", false, .{})) |rr| {
+                if (try gui.menuItemLabel(@src(), "Update All", .{}, .{})) |rr| {
                     _ = rr;
                     gui.menuGet().?.close();
                     if (g_db) |*db| {
@@ -629,7 +623,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                         var iter = try stmt.iterator(u32, .{});
                         while (try iter.nextAlloc(arena, .{})) |rowid| {
                             bgtask_mutex.lock();
-                            try bgtasks.append(.{ .kind = .update_feed, .rowid = @intCast(u32, rowid) });
+                            try bgtasks.append(.{ .kind = .update_feed, .rowid = @as(u32, @intCast(rowid)) });
                             bgtask_mutex.unlock();
                             bgtask_condition.signal();
                         }
@@ -676,7 +670,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                 if (g_db) |*db| {
                     const rowid = db.getLastInsertRowID();
                     bgtask_mutex.lock();
-                    try bgtasks.append(.{ .kind = .update_feed, .rowid = @intCast(u32, rowid) });
+                    try bgtasks.append(.{ .kind = .update_feed, .rowid = @as(u32, @intCast(rowid)) });
                     bgtask_mutex.unlock();
                     bgtask_condition.signal();
                 }
@@ -742,9 +736,9 @@ fn podcastSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                     var m = margin;
                     m.w = 0;
                     margin.x = 0;
-                    if (try gui.buttonIcon(@src(), 8 + (gui.themeGet().font_body.lineSkip() catch 12), "cancel_refresh", gui.icons.papirus.actions.system_restart_symbolic, .{
+                    if (try gui.buttonIcon(@src(), 8 + (gui.themeGet().font_body.lineHeight() catch 12), "cancel_refresh", gui.icons.papirus.actions.system_restart_symbolic, .{
                         .margin = m,
-                        .rotation = std.math.pi * @intToFloat(f32, @mod(@divFloor(gui.frameTimeNS(), 1_000_000), 1000)) / 1000,
+                        .rotation = std.math.pi * @as(f32, @floatFromInt(@mod(@divFloor(gui.frameTimeNS(), 1_000_000), 1000))) / 1000,
                     })) {
                         // TODO: cancel task
                     }
@@ -782,7 +776,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
         var menu = try gui.menu(@src(), .horizontal, .{ .expand = .horizontal });
         defer menu.deinit();
 
-        if (try gui.menuItemLabel(@src(), "Back", false, .{ .expand = .none })) |rr| {
+        if (try gui.menuItemLabel(@src(), "Back", .{}, .{ .expand = .none })) |rr| {
             _ = rr;
             paned.showOther();
         }
@@ -796,7 +790,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
         var scroll_info: gui.ScrollInfo = .{ .vertical = .given };
         if (gui.dataGet(null, tmpId, "scroll_info", gui.ScrollInfo)) |si| {
             scroll_info = si;
-            scroll_info.virtual_size.h = height * @intToFloat(f32, num_episodes);
+            scroll_info.virtual_size.h = height * @as(f32, @floatFromInt(num_episodes));
         }
         defer gui.dataSet(null, tmpId, "scroll_info", scroll_info);
 
@@ -868,7 +862,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                         }
                     } else {
                         if (try gui.buttonIcon(@src(), 18, "download", gui.icons.papirus.actions.browser_download_symbolic, .{ .padding = gui.Rect.all(6) })) {
-                            try bgtasks.append(.{ .kind = .download_episode, .rowid = @intCast(u32, episode.rowid) });
+                            try bgtasks.append(.{ .kind = .download_episode, .rowid = @as(u32, @intCast(episode.rowid)) });
                             bgtask_condition.signal();
                         }
                     }
@@ -884,7 +878,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *gui.PanedWidget) !void {
                 try gui.label(@src(), "{d:0>2}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .font_style = .heading, .gravity_x = 1.0, .gravity_y = 1.0 });
 
                 var f = gui.themeGet().font_heading;
-                f.line_skip_factor = 1.3;
+                f.line_height_factor = 1.3;
                 try tl.format("{s}\n", .{episode.title}, .{ .font = f });
                 //const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
                 //try tl.addText(lorem, .{});
@@ -939,7 +933,7 @@ fn player(arena: std.mem.Allocator) !void {
         if (current_speed != speed) {
             current_speed = speed;
             std.debug.print("setting speed {d}\n", .{current_speed});
-            stream_seek_time = std.math.max(0.0, current_time - 1.0);
+            stream_seek_time = @max(0.0, current_time - 1.0);
             buffer.discard(buffer.readableLength());
             buffer_last_time = stream_seek_time.?;
             current_time = stream_seek_time.?;
@@ -955,7 +949,7 @@ fn player(arena: std.mem.Allocator) !void {
         _ = dbRow(arena, "UPDATE episode SET duration=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
     }
 
-    var percent: f32 = @floatCast(f32, current_time / episode.duration);
+    var percent: f32 = @floatCast(current_time / episode.duration);
     if (try gui.slider(@src(), .horizontal, &percent, .{ .expand = .horizontal })) {
         stream_seek_time = percent * episode.duration;
         buffer.discard(buffer.readableLength());
@@ -980,7 +974,7 @@ fn player(arena: std.mem.Allocator) !void {
             try gui.label(@src(), "{d:0>2}:{d:0>2}", .{ mins, secs }, .{ .min_size_content = time_max_size });
         }
 
-        const time_left = std.math.max(0, episode.duration - current_time);
+        const time_left = @max(0, episode.duration - current_time);
         const hrs_left = @floor(time_left / 60.0 / 60.0);
         const mins_left = @floor((time_left - (hrs_left * 60.0 * 60.0)) / 60.0);
         const secs_left = @floor(time_left - (hrs_left * 60.0 * 60.0) - (mins_left * 60.0));
@@ -997,7 +991,7 @@ fn player(arena: std.mem.Allocator) !void {
     const oo2 = gui.Options{ .expand = .both, .gravity_x = 0.5, .gravity_y = 0.5 };
 
     if (try gui.buttonIcon(@src(), 20, "back", gui.icons.papirus.actions.media_seek_backward_symbolic, oo2)) {
-        stream_seek_time = std.math.max(0.0, current_time - 5.0);
+        stream_seek_time = @max(0.0, current_time - 5.0);
         buffer.discard(buffer.readableLength());
         buffer_last_time = stream_seek_time.?;
         current_time = stream_seek_time.?;
@@ -1015,7 +1009,7 @@ fn player(arena: std.mem.Allocator) !void {
     if (try gui.buttonIcon(@src(), 20, "forward", gui.icons.papirus.actions.media_seek_forward_symbolic, oo2)) {
         stream_seek_time = current_time + 5.0;
         if (!playing) {
-            stream_seek_time = std.math.min(stream_seek_time.?, episode.duration);
+            stream_seek_time = @min(stream_seek_time.?, episode.duration);
         }
         buffer.discard(buffer.readableLength());
         buffer_last_time = stream_seek_time.?;
@@ -1026,7 +1020,7 @@ fn player(arena: std.mem.Allocator) !void {
     if (playing) {
         const timerId = gui.parentGet().extendId(@src(), 0);
         const millis = @divFloor(gui.frameTimeNS(), 1_000_000);
-        const left = @intCast(i32, @rem(millis, 1000));
+        const left: i32 = @intCast(@rem(millis, 1000));
 
         if (gui.timerDone(timerId) or !gui.timerExists(timerId)) {
             const wait = 1000 * (1000 - left);
@@ -1078,20 +1072,20 @@ fn pause() void {
 
 export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) void {
     _ = user_data;
-    var len = @intCast(usize, length);
+    var len: usize = @intCast(length);
     var i: usize = 0;
 
     audio_mutex.lock();
     defer audio_mutex.unlock();
 
     while (i < len and buffer.readableLength() > 0) {
-        const size = std.math.min(len - i, buffer.readableSlice(0).len);
+        const size = @min(len - i, buffer.readableSlice(0).len);
         for (buffer.readableSlice(0)[0..size]) |s| {
             stream[i] = s;
             i += 1;
         }
         buffer.discard(size);
-        current_time = buffer_last_time - (@intToFloat(f64, buffer.readableLength()) / @intToFloat(f64, audio_spec.freq * 2 * 2));
+        current_time = buffer_last_time - (@as(f64, @floatFromInt(buffer.readableLength())) / @as(f64, @floatFromInt(audio_spec.freq * 2 * 2)));
 
         if (!buffer_eof and buffer.readableLength() < buffer.writableLength()) {
             // buffer is less than half full
@@ -1144,7 +1138,7 @@ fn playback_thread() !void {
         }
 
         const name = try std.fmt.allocPrintZ(arena, "episode_{d}.aud", .{rowid});
-        const filename = @ptrCast([*c]u8, name);
+        const filename: [*c]u8 = @ptrCast(name);
 
         var avfc: ?*c.AVFormatContext = null;
         var err = c.avformat_open_input(&avfc, filename, null, null);
@@ -1175,9 +1169,9 @@ fn playback_thread() !void {
             return;
         }
 
-        const avstream = avfc.?.streams[@intCast(usize, audio_stream_idx)];
+        const avstream = avfc.?.streams[@as(usize, @intCast(audio_stream_idx))];
         var avctx: *c.AVCodecContext = c.avcodec_alloc_context3(null);
-        defer c.avcodec_free_context(@ptrCast([*c][*c]c.AVCodecContext, &avctx));
+        defer c.avcodec_free_context(@ptrCast(&avctx));
 
         err = c.avcodec_parameters_to_context(avctx, avstream.*.codecpar);
         if (err != 0) {
@@ -1187,11 +1181,11 @@ fn playback_thread() !void {
         }
 
         audio_mutex.lock();
-        stream_timebase = @intToFloat(f64, avstream.*.time_base.num) / @intToFloat(f64, avstream.*.time_base.den);
+        stream_timebase = @as(f64, @floatFromInt(avstream.*.time_base.num)) / @as(f64, @floatFromInt(avstream.*.time_base.den));
         //std.debug.print("timebase {d}\n", .{stream_timebase});
         var duration: ?f64 = null;
         if (avstream.*.duration != c.AV_NOPTS_VALUE) {
-            duration = @intToFloat(f64, avstream.*.duration) * stream_timebase;
+            duration = @as(f64, @floatFromInt(avstream.*.duration)) * stream_timebase;
         }
         audio_mutex.unlock();
 
@@ -1220,9 +1214,9 @@ fn playback_thread() !void {
         c.av_channel_layout_default(&target_ch_layout, 2);
 
         var frame: *c.AVFrame = c.av_frame_alloc();
-        defer c.av_frame_free(@ptrCast([*c][*c]c.AVFrame, &frame));
+        defer c.av_frame_free(@ptrCast(&frame));
         var outframe: *c.AVFrame = c.av_frame_alloc();
-        defer c.av_frame_free(@ptrCast([*c][*c]c.AVFrame, &outframe));
+        defer c.av_frame_free(@ptrCast(&outframe));
         var pkt: *c.AVPacket = c.av_packet_alloc();
         var graph: ?*c.AVFilterGraph = null;
         var graph_src: ?*c.AVFilterContext = null;
@@ -1248,7 +1242,7 @@ fn playback_thread() !void {
             if (stream_seek_time) |st| {
                 stream_seek_time = null;
                 std.debug.print("seeking to {d}\n", .{st});
-                err = c.avformat_seek_file(avfc, audio_stream_idx, 0, @floatToInt(i64, st / stream_timebase), std.math.maxInt(i64), 0);
+                err = c.avformat_seek_file(avfc, audio_stream_idx, 0, @as(i64, @intFromFloat(st / stream_timebase)), std.math.maxInt(i64), 0);
                 if (err != 0) {
                     _ = c.av_strerror(err, &buf, 256);
                     std.debug.print("av_format_seek_file err {d} : {s}\n", .{ err, std.mem.sliceTo(&buf, 0) });
@@ -1399,7 +1393,7 @@ fn playback_thread() !void {
 
                     defer c.av_frame_unref(outframe);
 
-                    const data_size = @intCast(usize, outframe.nb_samples * 2 * 2); // 2 bytes per sample per channel
+                    const data_size: usize = @intCast(outframe.nb_samples * 2 * 2); // 2 bytes per sample per channel
 
                     audio_mutex.lock();
                     defer audio_mutex.unlock();
@@ -1421,9 +1415,9 @@ fn playback_thread() !void {
                         slice[i] = outframe.data[0][i];
                     }
                     buffer.update(data_size);
-                    const seconds_written = @intToFloat(f64, outframe.nb_samples) / @intToFloat(f64, audio_spec.freq);
+                    const seconds_written = @as(f64, @floatFromInt(outframe.nb_samples)) / @as(f64, @floatFromInt(audio_spec.freq));
 
-                    buffer_last_time = @intToFloat(f64, outframe.*.best_effort_timestamp) * stream_timebase + seconds_written;
+                    buffer_last_time = @as(f64, @floatFromInt(outframe.*.best_effort_timestamp)) * stream_timebase + seconds_written;
                 }
             }
         }
@@ -1480,13 +1474,7 @@ fn bg_thread() !void {
                         fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
                             _ = size;
                             var slice = (ptr orelse return 0)[0..nmemb];
-                            const fifo = @ptrCast(
-                                *Fifo,
-                                @alignCast(
-                                    @alignOf(*Fifo),
-                                    data orelse return 0,
-                                ),
-                            );
+                            const fifo: *Fifo = @ptrCast(@alignCast(data orelse return 0));
 
                             fifo.writer().writeAll(slice) catch return 0;
                             return nmemb;
