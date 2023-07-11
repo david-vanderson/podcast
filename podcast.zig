@@ -905,43 +905,6 @@ fn player(arena: std.mem.Allocator) !void {
         .font_style = .heading,
     });
 
-    {
-        var box3 = try gui.box(@src(), .horizontal, .{ .expand = .horizontal, .padding = .{ .x = 4, .y = 4, .w = 4, .h = 4 } });
-        defer box3.deinit();
-
-        var speed: f32 = 1.0;
-        if (episode_id) |_| {
-            speed = try dbRow(arena, "SELECT speed FROM podcast WHERE rowid = ?", f32, .{episode.podcast_id}) orelse 1.0;
-            if (speed == 0) speed = 1.0;
-        }
-
-        try gui.label(@src(), "{d:.2}", .{speed}, .{});
-
-        if (try gui.button(@src(), "speed up", .{})) {
-            speed += 0.1;
-            speed = @min(3.0, speed);
-            _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
-        }
-
-        if (try gui.button(@src(), "speed down", .{})) {
-            speed -= 0.1;
-            speed = @max(0.5, speed);
-            _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
-        }
-
-        audio_mutex.lock();
-        if (current_speed != speed) {
-            current_speed = speed;
-            std.debug.print("setting speed {d}\n", .{current_speed});
-            stream_seek_time = @max(0.0, current_time - 1.0);
-            buffer.discard(buffer.readableLength());
-            buffer_last_time = stream_seek_time.?;
-            current_time = stream_seek_time.?;
-            audio_condition.signal();
-        }
-        audio_mutex.unlock();
-    }
-
     audio_mutex.lock();
 
     if (current_time > episode.duration) {
@@ -972,6 +935,71 @@ fn player(arena: std.mem.Allocator) !void {
             try gui.label(@src(), "{d}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .min_size_content = time_max_size });
         } else {
             try gui.label(@src(), "{d:0>2}:{d:0>2}", .{ mins, secs }, .{ .min_size_content = time_max_size });
+        }
+
+        {
+            var box4 = try gui.box(@src(), .horizontal, .{ .expand = .horizontal });
+            defer box4.deinit();
+
+            _ = gui.spacer(@src(), .{}, .{ .expand = .horizontal });
+
+            var speed: f32 = 1.0;
+            if (episode_id) |_| {
+                speed = try dbRow(arena, "SELECT speed FROM podcast WHERE rowid = ?", f32, .{episode.podcast_id}) orelse 1.0;
+                if (speed == 0) speed = 1.0;
+                speed = @min(2.0, @max(0.5, speed));
+            }
+
+            //try gui.label(@src(), "{d:.2}", .{speed}, .{});
+
+            if (try gui.buttonIcon(@src(), 18, "speed down", gui.icons.papirus.actions.list_remove_symbolic, .{})) {
+                speed -= 0.1;
+                speed = @max(0.5, speed);
+                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+            }
+
+            const entries = [_][]const u8{
+                "0.5x",
+                "0.6x",
+                "0.7x",
+                "0.8x",
+                "0.9x",
+                "1.0x",
+                "1.1x",
+                "1.2x",
+                "1.3x",
+                "1.4x",
+                "1.5x",
+                "1.6x",
+                "1.7x",
+                "1.8x",
+                "1.9x",
+                "2.0x",
+            };
+            var choice: usize = @intFromFloat(@round((speed - 0.5) / 0.1));
+
+            if (try gui.dropdown(@src(), &entries, &choice, .{ .expand = .vertical, .min_size_content = .{ .w = 50 } })) {
+                speed = 0.5 + 0.1 * @as(f32, @floatFromInt(choice));
+                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+            }
+
+            if (try gui.buttonIcon(@src(), 18, "speed up", gui.icons.papirus.actions.list_add_symbolic, .{})) {
+                speed += 0.1;
+                speed = @min(2.0, speed);
+                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+            }
+
+            _ = gui.spacer(@src(), .{}, .{ .expand = .horizontal });
+
+            if (current_speed != speed) {
+                current_speed = speed;
+                //std.debug.print("setting speed {d}\n", .{current_speed});
+                stream_seek_time = @max(0.0, current_time - 1.0);
+                buffer.discard(buffer.readableLength());
+                buffer_last_time = stream_seek_time.?;
+                current_time = stream_seek_time.?;
+                audio_condition.signal();
+            }
         }
 
         const time_left = @max(0, episode.duration - current_time);
