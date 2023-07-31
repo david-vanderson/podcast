@@ -17,11 +17,11 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const gui_dep = b.dependency("gui", .{ .target = target, .optimize = optimize });
-    exe.addModule("gui", gui_dep.module("gui"));
-    exe.addModule("SDLBackend", gui_dep.module("SDLBackend"));
+    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
+    exe.addModule("dvui", dvui_dep.module("dvui"));
+    exe.addModule("SDLBackend", dvui_dep.module("SDLBackend"));
 
-    const freetype_dep = gui_dep.builder.dependency("freetype", .{
+    const freetype_dep = dvui_dep.builder.dependency("freetype", .{
         .target = target,
         .optimize = optimize,
     });
@@ -31,12 +31,12 @@ pub fn build(b: *std.Build) !void {
     exe.linkLibC();
 
     const sqlite = b.addStaticLibrary(.{ .name = "sqlite", .target = target, .optimize = optimize });
-    sqlite.addCSourceFile("libs/zig-sqlite/c/sqlite3.c", &[_][]const u8{"-std=c99"});
+    sqlite.addCSourceFile(.{ .file = .{ .path = "libs/zig-sqlite/c/sqlite3.c" }, .flags = &[_][]const u8{"-std=c99"} });
     sqlite.linkLibC();
 
     exe.linkLibrary(sqlite);
     exe.addAnonymousModule("sqlite", .{ .source_file = .{ .path = "libs/zig-sqlite/sqlite.zig" } });
-    exe.addIncludePath("libs/zig-sqlite/c");
+    exe.addIncludePath(.{ .path = "libs/zig-sqlite/c" });
 
     const curl_dep = b.dependency("curl", .{ .target = target, .optimize = optimize });
     exe.linkLibrary(curl_dep.artifact("curl"));
@@ -92,7 +92,7 @@ pub fn build(b: *std.Build) !void {
     //}
 
     const compile_step = b.step("compile-" ++ "podcast", "Compile " ++ "podcast");
-    compile_step.dependOn(&b.addInstallArtifact(exe).step);
+    compile_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
     b.getInstallStep().dependOn(compile_step);
 
     const run_cmd = b.addRunArtifact(exe);

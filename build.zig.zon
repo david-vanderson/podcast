@@ -2,21 +2,21 @@
     .name = "podcast",
     .version = "0.0.1",
     .dependencies = .{
-        .gui = .{
-            .url = "https://github.com/david-vanderson/gui/archive/8e746cfb1eaf330fcd6957557ff42d0c5e4881e6.tar.gz",
-            .hash = "1220910c4282fe45ee39fb3338d05465d24489d2a5bae2b3e18f3606264dd2fc2617",
+        .dvui = .{
+            .url = "https://github.com/david-vanderson/gui/archive/2d044a119c740cc3ecf88fd164c6f54b6e28c406.tar.gz",
+            .hash = "12206802bc69712218d4d5415b0202d1f957ae70fabe2f839a2b170a774c360116f0",
         },
         .ffmpeg = .{
-            .url = "https://github.com/andrewrk/ffmpeg/archive/f794541f05c875c91a746ccb8c906d60b538ae0f.tar.gz",
-            .hash = "12201e39829ef796f49dc81711ec6f22e591638e2af60baf8be698ea8d5bb1caa29e",
+            .url = "https://github.com/andrewrk/ffmpeg/archive/73ac2d6ce909854436a23a26a9f712861eec2b4e.tar.gz",
+            .hash = "1220e1674169be14f2d5c187f53e80247796c99fabf14aa290589b2a01a8021ae171",
         },
         .curl = .{
-            .url = "https://github.com/david-vanderson/curl/archive/eaa13cf0c19dad01bc6b0d907d9beaa5f2f983ba.tar.gz",
-            .hash = "12203a4e1ac1e365b69a3fe710fdb2fcae1489d57d4a06caa7c8a5f3d4658bac8e84",
+            .url = "https://github.com/david-vanderson/curl/archive/df1c5ab12817e73d31db186f313c8a2f05c1f97d.tar.gz",
+            .hash = "1220aec24f72c4c16da330b73da0836456da5e594940f92e5281613cbcd2de40ee40",
         },
         .libxml2 = .{
-            .url = "https://github.com/david-vanderson/libxml2/archive/50ce307b17c47e0bd096e9e42a6b92cde6282d96.tar.gz",
-            .hash = "122069c955968903c898899e11170fec845d998c8a0f256ca0ba254b1c35999eb668",
+            .url = "https://github.com/david-vanderson/libxml2/archive/d2341fd369f2eae370cb00d463caad3a6c722f87.tar.gz",
+            .hash = "1220328594fa1cc194ec03460ec946da09eb38a298b328bb147344bdc30d8a511fcd",
         },
     },
 }
