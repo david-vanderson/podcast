@@ -1,8 +1,6 @@
 
 store current position for each episode
 
-need to sort episode list by date
-
 can zig-sqlite be used as a zig dependency?
 
 replace debug messages with toasts
