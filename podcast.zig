@@ -56,9 +56,9 @@ const Task = struct {
 };
 
 const Episode = struct {
-    const query_base = "SELECT rowid, podcast_id, title, description, enclosure_url, position, duration FROM episode";
+    const query_base = "SELECT rowid, podcast_id, title, description, enclosure_url, position, duration, pubDate FROM episode";
     const query_one = query_base ++ " WHERE rowid = ?";
-    const query_all = query_base ++ " WHERE podcast_id = ?";
+    const query_all = query_base ++ " WHERE podcast_id = ? ORDER BY pubDate DESC";
     rowid: usize,
     podcast_id: usize,
     title: []const u8,
@@ -66,6 +66,7 @@ const Episode = struct {
     enclosure_url: []const u8,
     position: f64,
     duration: f64,
+    pubDate: usize,
 };
 
 fn dbErrorCallafter(id: u32, response: dvui.DialogResponse) dvui.Error!void {
@@ -868,12 +869,22 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
 
                 cbox.deinit();
 
-                tl.processEvents();
+                var tbox = try dvui.box(@src(), .vertical, .{ .gravity_x = 1.0, .gravity_y = 1.0 });
+
+                const epoch_secs = std.time.epoch.EpochSeconds{ .secs = episode.pubDate };
+                const epoch_day = epoch_secs.getEpochDay();
+                const year_day = epoch_day.calculateYearDay();
+                const month_day = year_day.calculateMonthDay();
+                try dvui.label(@src(), "{d}/{d}/{d}", .{ year_day.year % 1000, month_day.month.numeric(), month_day.day_index }, .{ .font_style = .heading });
 
                 const hrs = @floor(episode.duration / 60.0 / 60.0);
                 const mins = @floor((episode.duration - (hrs * 60.0 * 60.0)) / 60.0);
                 const secs = @floor(episode.duration - (hrs * 60.0 * 60.0) - (mins * 60.0));
-                try dvui.label(@src(), "{d:0>2}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .font_style = .heading, .gravity_x = 1.0, .gravity_y = 1.0 });
+                try dvui.label(@src(), "{d:0>2}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .font_style = .heading });
+
+                tbox.deinit();
+
+                tl.processEvents();
 
                 var f = dvui.themeGet().font_heading;
                 f.line_height_factor = 1.3;
@@ -890,7 +901,7 @@ fn player(arena: std.mem.Allocator) !void {
     var box = try dvui.box(@src(), .vertical, .{ .expand = .horizontal, .color_style = .content, .background = true });
     defer box.deinit();
 
-    var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0 };
+    var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0, .pubDate = 0 };
 
     const episode_id = try dbRow(arena, "SELECT episode_id FROM player", i32, .{});
     if (episode_id) |id| {
