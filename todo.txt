@@ -10,9 +10,8 @@ progress bar for downloading
 need image support for thumbnails
 - zigimg?  stb_image?
 
-update gui to be able to paste urls into the rss textEntry
-
-dropdown for speed selection
+update gui to be able to paste urls into the rss textEntry via touch
+- maybe just an extra button for now?
 
 progress bar for downloads
 

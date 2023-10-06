@@ -11,15 +11,28 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
-    exe.addModule("dvui", dvui_dep.module("dvui"));
-    exe.addModule("SDLBackend", dvui_dep.module("SDLBackend"));
+    if (true) {
+        const dvui_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/dvui.zig" } });
+        exe.addModule("dvui", dvui_mod);
+        const sdlbackend_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/backends/SDLBackend.zig" }, .dependencies = &.{.{ .name = "dvui", .module = dvui_mod }} });
+        exe.addModule("SDLBackend", sdlbackend_mod);
 
-    const freetype_dep = dvui_dep.builder.dependency("freetype", .{
-        .target = target,
-        .optimize = .ReleaseFast,
-    });
-    exe.linkLibrary(freetype_dep.artifact("freetype"));
+        const freetype_dep = b.dependency("freetype", .{
+            .target = exe.target,
+            .optimize = exe.optimize,
+        });
+        exe.linkLibrary(freetype_dep.artifact("freetype"));
+    } else {
+        const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
+        exe.addModule("dvui", dvui_dep.module("dvui"));
+        exe.addModule("SDLBackend", dvui_dep.module("SDLBackend"));
+
+        const freetype_dep = dvui_dep.builder.dependency("freetype", .{
+            .target = target,
+            .optimize = .ReleaseFast,
+        });
+        exe.linkLibrary(freetype_dep.artifact("freetype"));
+    }
 
     exe.linkSystemLibrary("SDL2");
     exe.linkLibC();

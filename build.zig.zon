@@ -6,6 +6,10 @@
             .url = "https://github.com/david-vanderson/gui/archive/67a0481fbdea2f6afa8ea4809605c00951300f0f.tar.gz",
             .hash = "1220a34f8e72016e30f0c8b12e127e19100cbfd9492eadd9e82627065cdd931de1ad",
         },
+        .freetype = .{
+            .url = "https://github.com/david-vanderson/freetype/archive/18a1df5a3ef8afa0782c419b153a21e9e160335f.tar.gz",
+            .hash = "1220b305af272ac3026704b8d7e13740350daf59a6a95e45dedb428c55933e3df925",
+        },
         .ffmpeg = .{
             .url = "https://github.com/andrewrk/ffmpeg/archive/73ac2d6ce909854436a23a26a9f712861eec2b4e.tar.gz",
             .hash = "1220e1674169be14f2d5c187f53e80247796c99fabf14aa290589b2a01a8021ae171",

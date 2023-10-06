@@ -599,7 +599,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
             var menu = try dvui.menu(@src(), .horizontal, .{ .gravity_x = 1.0 });
             defer menu.deinit();
 
-            if (try dvui.menuItemIcon(@src(), "menu", dvui.icons.entypo.menu, .{ .submenu = true }, .{ .expand = .none })) |r| {
+            if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .none })) |r| {
                 var fw = try dvui.popup(@src(), dvui.Rect.fromPoint(dvui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
                 if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{})) |rr| {
@@ -735,7 +735,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                     var m = margin;
                     m.w = 0;
                     margin.x = 0;
-                    if (try dvui.buttonIcon(@src(), 8 + (dvui.themeGet().font_body.lineHeight() catch 12), "cancel_refresh", dvui.icons.entypo.circle_with_cross, .{
+                    if (try dvui.buttonIcon(@src(), 8 + (dvui.themeGet().font_body.lineHeight() catch 12), "cancel_refresh", dvui.entypo.circle_with_cross, .{
                         .margin = m,
                         .rotation = std.math.pi * @as(f32, @floatFromInt(@mod(@divFloor(dvui.frameTimeNS(), 1_000_000), 1000))) / 1000,
                     })) {
@@ -819,7 +819,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 const filename = try std.fmt.allocPrint(arena, "episode_{d}.aud", .{episode.rowid});
                 const file = std.fs.cwd().openFile(filename, .{}) catch null;
 
-                if (try dvui.buttonIcon(@src(), 18, "play", dvui.icons.entypo.controller_play, .{ .padding = dvui.Rect.all(6) })) {
+                if (try dvui.buttonIcon(@src(), 18, "play", dvui.entypo.controller_play, .{ .padding = dvui.Rect.all(6) })) {
                     if (file == null) {
                         // TODO: make the play button disabled, and if you click it, it puts this out as a toast
                         try dvui.dialog(@src(), .{ .title = "Error", .message = try std.fmt.allocPrint(arena, "Must download first", .{}) });
@@ -842,7 +842,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 if (file) |f| {
                     f.close();
 
-                    if (try dvui.buttonIcon(@src(), 18, "delete", dvui.icons.entypo.trash, .{ .padding = dvui.Rect.all(6) })) {
+                    if (try dvui.buttonIcon(@src(), 18, "delete", dvui.entypo.trash, .{ .padding = dvui.Rect.all(6) })) {
                         std.fs.cwd().deleteFile(filename) catch |err| {
                             // TODO: make this a toast
                             try dvui.dialog(@src(), .{ .title = "Delete Error", .message = try std.fmt.allocPrint(arena, "error {!}\ntrying to delete file:\n{s}", .{ err, filename }) });
@@ -854,13 +854,13 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                     for (bgtasks.items) |*t| {
                         if (t.rowid == episode.rowid) {
                             // show progress, make download button into cancel button
-                            if (try dvui.buttonIcon(@src(), 18, "cancel", dvui.icons.entypo.circle_with_cross, .{ .padding = dvui.Rect.all(6) })) {
+                            if (try dvui.buttonIcon(@src(), 18, "cancel", dvui.entypo.circle_with_cross, .{ .padding = dvui.Rect.all(6) })) {
                                 t.cancel = true;
                             }
                             break;
                         }
                     } else {
-                        if (try dvui.buttonIcon(@src(), 18, "download", dvui.icons.entypo.download, .{ .padding = dvui.Rect.all(6) })) {
+                        if (try dvui.buttonIcon(@src(), 18, "download", dvui.entypo.download, .{ .padding = dvui.Rect.all(6) })) {
                             try bgtasks.append(.{ .kind = .download_episode, .rowid = @as(u32, @intCast(episode.rowid)) });
                             bgtask_condition.signal();
                         }
@@ -961,7 +961,7 @@ fn player(arena: std.mem.Allocator) !void {
 
             //try dvui.label(@src(), "{d:.2}", .{speed}, .{});
 
-            if (try dvui.buttonIcon(@src(), 18, "speed down", dvui.icons.entypo.minus, .{})) {
+            if (try dvui.buttonIcon(@src(), 18, "speed down", dvui.entypo.minus, .{})) {
                 speed -= 0.1;
                 speed = @max(0.5, speed);
                 _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
@@ -992,7 +992,7 @@ fn player(arena: std.mem.Allocator) !void {
                 _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
             }
 
-            if (try dvui.buttonIcon(@src(), 18, "speed up", dvui.icons.entypo.plus, .{})) {
+            if (try dvui.buttonIcon(@src(), 18, "speed up", dvui.entypo.plus, .{})) {
                 speed += 0.1;
                 speed = @min(2.0, speed);
                 _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
@@ -1027,7 +1027,7 @@ fn player(arena: std.mem.Allocator) !void {
 
     const oo2 = dvui.Options{ .expand = .both, .gravity_x = 0.5, .gravity_y = 0.5 };
 
-    if (try dvui.buttonIcon(@src(), 20, "back", dvui.icons.entypo.controller_fast_backward, oo2)) {
+    if (try dvui.buttonIcon(@src(), 20, "back", dvui.entypo.controller_fast_backward, oo2)) {
         stream_seek_time = @max(0.0, current_time - 5.0);
         buffer.discard(buffer.readableLength());
         buffer_last_time = stream_seek_time.?;
@@ -1035,7 +1035,7 @@ fn player(arena: std.mem.Allocator) !void {
         audio_condition.signal();
     }
 
-    if (try dvui.buttonIcon(@src(), 20, if (playing) "pause" else "play", if (playing) dvui.icons.entypo.controller_pause else dvui.icons.entypo.controller_play, oo2)) {
+    if (try dvui.buttonIcon(@src(), 20, if (playing) "pause" else "play", if (playing) dvui.entypo.controller_pause else dvui.entypo.controller_play, oo2)) {
         if (playing) {
             pause();
         } else {
@@ -1043,7 +1043,7 @@ fn player(arena: std.mem.Allocator) !void {
         }
     }
 
-    if (try dvui.buttonIcon(@src(), 20, "forward", dvui.icons.entypo.controller_fast_forward, oo2)) {
+    if (try dvui.buttonIcon(@src(), 20, "forward", dvui.entypo.controller_fast_forward, oo2)) {
         stream_seek_time = current_time + 5.0;
         if (!playing) {
             stream_seek_time = @min(stream_seek_time.?, episode.duration);
