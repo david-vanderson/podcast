@@ -11,7 +11,8 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    if (true) {
+    const local_dev = true;
+    if (local_dev) {
         const dvui_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/dvui.zig" } });
         exe.addModule("dvui", dvui_mod);
         const sdlbackend_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/backends/SDLBackend.zig" }, .dependencies = &.{.{ .name = "dvui", .module = dvui_mod }} });
@@ -22,6 +23,9 @@ pub fn build(b: *std.Build) !void {
             .optimize = exe.optimize,
         });
         exe.linkLibrary(freetype_dep.artifact("freetype"));
+
+        exe.addIncludePath(.{ .path = "/home/purism/SDL2-2.28.1/include" });
+        exe.addObjectFile(.{ .path = "/home/purism/SDL2-2.28.1/build/.libs/libSDL2.a" });
     } else {
         const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
         exe.addModule("dvui", dvui_dep.module("dvui"));
@@ -32,9 +36,10 @@ pub fn build(b: *std.Build) !void {
             .optimize = .ReleaseFast,
         });
         exe.linkLibrary(freetype_dep.artifact("freetype"));
+
+        exe.linkSystemLibrary("SDL2");
     }
 
-    exe.linkSystemLibrary("SDL2");
     exe.linkLibC();
 
     const sqlite = b.addStaticLibrary(.{ .name = "sqlite", .target = target, .optimize = .ReleaseFast });
