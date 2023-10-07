@@ -515,6 +515,10 @@ pub fn main() !void {
     g_win = try dvui.Window.init(@src(), 0, gpa, backend.backend());
     defer g_win.deinit();
 
+    const winSize = backend.windowSize();
+    const pxSize = backend.pixelSize();
+    std.debug.print("initial window logical {} pixels {} natural scale {d} initial content scale {d} snap_to_pixels {}\n", .{ winSize, pxSize, pxSize.w / winSize.w, backend.initial_scale, g_win.snap_to_pixels });
+
     {
         var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena_allocator.deinit();
