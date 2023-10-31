@@ -15,6 +15,11 @@ pub fn build(b: *std.Build) !void {
     if (local_dev) {
         const dvui_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/dvui.zig" } });
         exe.addModule("dvui", dvui_mod);
+
+        // stb_image
+        exe.addIncludePath(.{ .path = "../dvui/src" }); // for src/stb_image.h
+        exe.addCSourceFiles(&.{"../dvui/src/stb_image_impl.c"}, &.{});
+
         const sdlbackend_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/backends/SDLBackend.zig" }, .dependencies = &.{.{ .name = "dvui", .module = dvui_mod }} });
         exe.addModule("SDLBackend", sdlbackend_mod);
 

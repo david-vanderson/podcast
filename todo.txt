@@ -1,4 +1,9 @@
 
+allow deleting whole podcasts
+- also don't add it if the fetch doesn't work?
+
+when switching podcasts, reset episode scroll info
+
 store current position for each episode
 
 can zig-sqlite be used as a zig dependency?
