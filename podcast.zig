@@ -758,7 +758,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 .padding = dvui.Rect.all(8),
             }))) {
                 g_podcast_id_on_right = rowid;
-                paned.showOther();
+                paned.animateSplit(0.0);
             }
         }
     }
@@ -780,7 +780,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
 
         if (try dvui.menuItemLabel(@src(), "Back", .{}, .{ .expand = .none })) |rr| {
             _ = rr;
-            paned.showOther();
+            paned.animateSplit(1.0);
         }
     }
 
@@ -1147,7 +1147,7 @@ export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) 
             pause();
 
             // refresh dvui
-            Backend.refresh();
+            dvui.refresh(&g_win, @src(), null);
         }
     }
 }
@@ -1559,6 +1559,6 @@ fn bg_thread() !void {
         bgtask_mutex.unlock();
 
         // refresh gui
-        Backend.refresh();
+        dvui.refresh(&g_win, @src(), null);
     }
 }

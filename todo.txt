@@ -1,4 +1,6 @@
 
+add episode images
+
 allow deleting whole podcasts
 - also don't add it if the fetch doesn't work?
 

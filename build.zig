@@ -11,14 +11,10 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const local_dev = true;
+    const local_dev = false;
     if (local_dev) {
         const dvui_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/dvui.zig" } });
         exe.addModule("dvui", dvui_mod);
-
-        // stb_image
-        exe.addIncludePath(.{ .path = "../dvui/src" }); // for src/stb_image.h
-        exe.addCSourceFiles(&.{"../dvui/src/stb_image_impl.c"}, &.{});
 
         const sdlbackend_mod = b.createModule(.{ .source_file = .{ .path = "../dvui/src/backends/SDLBackend.zig" }, .dependencies = &.{.{ .name = "dvui", .module = dvui_mod }} });
         exe.addModule("SDLBackend", sdlbackend_mod);
@@ -29,8 +25,15 @@ pub fn build(b: *std.Build) !void {
         });
         exe.linkLibrary(freetype_dep.artifact("freetype"));
 
-        exe.addIncludePath(.{ .path = "/home/purism/SDL2-2.28.1/include" });
-        exe.addObjectFile(.{ .path = "/home/purism/SDL2-2.28.1/build/.libs/libSDL2.a" });
+        const stbi_dep = b.dependency("stb_image", .{
+            .target = exe.target,
+            .optimize = exe.optimize,
+        });
+        exe.linkLibrary(stbi_dep.artifact("stb_image"));
+
+        //exe.addIncludePath(.{ .path = "/home/purism/SDL2-2.28.1/include" });
+        //exe.addObjectFile(.{ .path = "/home/purism/SDL2-2.28.1/build/.libs/libSDL2.a" });
+        exe.linkSystemLibrary("SDL2");
     } else {
         const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
         exe.addModule("dvui", dvui_dep.module("dvui"));
@@ -41,6 +44,12 @@ pub fn build(b: *std.Build) !void {
             .optimize = .ReleaseFast,
         });
         exe.linkLibrary(freetype_dep.artifact("freetype"));
+
+        const stbi_dep = dvui_dep.builder.dependency("stb_image", .{
+            .target = exe.target,
+            .optimize = exe.optimize,
+        });
+        exe.linkLibrary(stbi_dep.artifact("stb_image"));
 
         exe.linkSystemLibrary("SDL2");
     }

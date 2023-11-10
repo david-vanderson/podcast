@@ -3,12 +3,16 @@
     .version = "0.0.1",
     .dependencies = .{
         .dvui = .{
-            .url = "https://github.com/david-vanderson/gui/archive/67a0481fbdea2f6afa8ea4809605c00951300f0f.tar.gz",
-            .hash = "1220a34f8e72016e30f0c8b12e127e19100cbfd9492eadd9e82627065cdd931de1ad",
+            .url = "https://github.com/david-vanderson/gui/archive/656c07ebec8d668f5b21e442188c83a1949e2a7b.tar.gz",
+            .hash = "122050cbc798cff836309dd5095e0a6bab9509601efde96c4dedccc89502feadb75b",
         },
         .freetype = .{
             .url = "https://github.com/david-vanderson/freetype/archive/18a1df5a3ef8afa0782c419b153a21e9e160335f.tar.gz",
             .hash = "1220b305af272ac3026704b8d7e13740350daf59a6a95e45dedb428c55933e3df925",
+        },
+        .stb_image = .{
+            .url = "https://github.com/david-vanderson/stb_image/archive/9a961327f5e67ec799bc9a6258d7abebb59d7028.tar.gz",
+            .hash = "1220e47cea6fd7a0098a1b0ac3e47a2c3b558dc3afb0a75c71d7b00e53936824287e",
         },
         .ffmpeg = .{
             .url = "https://github.com/andrewrk/ffmpeg/archive/73ac2d6ce909854436a23a26a9f712861eec2b4e.tar.gz",
