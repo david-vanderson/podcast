@@ -1,5 +1,5 @@
 
-add episode images
+add podcast/episode images
 
 allow deleting whole podcasts
 - also don't add it if the fetch doesn't work?
@@ -14,13 +14,5 @@ replace debug messages with toasts
 
 progress bar for downloading
 
-need image support for thumbnails
-- zigimg?  stb_image?
-
-update gui to be able to paste urls into the rss textEntry via touch
-- maybe just an extra button for now?
-
-progress bar for downloads
-
-image support for podcast/episode images
+instead of rotating symbol for showing updating, could use entypo progress (one, two, full) icons
 
