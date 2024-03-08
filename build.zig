@@ -25,11 +25,16 @@ pub fn build(b: *std.Build) !void {
         });
         exe.linkLibrary(freetype_dep.artifact("freetype"));
 
-        const stbi_dep = b.dependency("stb_image", .{
-            .target = exe.target,
-            .optimize = exe.optimize,
+        const lib_bundle = b.addStaticLibrary(.{
+            .name = "dvui_libs",
+            .target = target,
+            .optimize = optimize,
         });
-        exe.linkLibrary(stbi_dep.artifact("stb_image"));
+        lib_bundle.addCSourceFile(.{ .file = .{ .path = "../dvui/src/stb/stb_image_impl.c" }, .flags = &.{} });
+        lib_bundle.addCSourceFile(.{ .file = .{ .path = "../dvui/src/stb/stb_truetype_impl.c" }, .flags = &.{} });
+        lib_bundle.linkLibC();
+        exe.linkLibrary(lib_bundle);
+        exe.addIncludePath(.{ .path = "../dvui/src/stb" });
 
         //exe.addIncludePath(.{ .path = "/home/purism/SDL2-2.28.1/include" });
         //exe.addObjectFile(.{ .path = "/home/purism/SDL2-2.28.1/build/.libs/libSDL2.a" });
@@ -39,19 +44,8 @@ pub fn build(b: *std.Build) !void {
         exe.addModule("dvui", dvui_dep.module("dvui"));
         exe.addModule("SDLBackend", dvui_dep.module("SDLBackend"));
 
-        const freetype_dep = dvui_dep.builder.dependency("freetype", .{
-            .target = target,
-            .optimize = .ReleaseFast,
-        });
-        exe.linkLibrary(freetype_dep.artifact("freetype"));
-
-        const stbi_dep = dvui_dep.builder.dependency("stb_image", .{
-            .target = exe.target,
-            .optimize = exe.optimize,
-        });
-        exe.linkLibrary(stbi_dep.artifact("stb_image"));
-
-        exe.linkSystemLibrary("SDL2");
+        exe.linkLibrary(dvui_dep.artifact("dvui_libs"));
+        @import("root").dependencies.imports.dvui.add_include_paths(dvui_dep.builder, exe);
     }
 
     exe.linkLibC();

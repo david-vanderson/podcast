@@ -604,14 +604,12 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
             if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .none, .min_size_content = .{ .h = 14 } })) |r| {
                 var fw = try dvui.floatingMenu(@src(), dvui.Rect.fromPoint(dvui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
-                if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{})) |rr| {
-                    _ = rr;
+                if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{ .expand = .horizontal })) |_| {
                     dvui.menuGet().?.close();
                     add_rss_dialog = true;
                 }
 
-                if (try dvui.menuItemLabel(@src(), "Update All", .{}, .{})) |rr| {
-                    _ = rr;
+                if (try dvui.menuItemLabel(@src(), "Update All", .{}, .{ .expand = .horizontal })) |_| {
                     dvui.menuGet().?.close();
                     if (g_db) |*db| {
                         const query = "SELECT rowid FROM podcast";
@@ -754,7 +752,9 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 .color_fill = .{ .name = .fill },
             })) {
                 g_podcast_id_on_right = rowid;
-                paned.animateSplit(0.0);
+                if (paned.collapsed()) {
+                    paned.animateSplit(0.0);
+                }
             }
         }
     }
