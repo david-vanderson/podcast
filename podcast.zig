@@ -826,7 +826,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                         _ = try dbRow(arena, "UPDATE player SET episode_id=?", u8, .{episode.rowid});
                         audio_mutex.lock();
                         stream_new = true;
-                        stream_seek_time = 0;
+                        stream_seek_time = episode.position;
                         buffer.discard(buffer.readableLength());
                         buffer_last_time = stream_seek_time.?;
                         current_time = stream_seek_time.?;
@@ -1051,6 +1051,11 @@ fn player(arena: std.mem.Allocator) !void {
         buffer_last_time = stream_seek_time.?;
         current_time = stream_seek_time.?;
         audio_condition.signal();
+    }
+
+    if (episode.position != current_time) {
+        //std.debug.print("updating episode {d} position to {d}\n", .{ episode.rowid, current_time });
+        _ = dbRow(arena, "UPDATE episode SET position=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
     }
 
     if (playing) {
