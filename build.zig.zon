@@ -3,28 +3,25 @@
     .version = "0.0.1",
     .dependencies = .{
         .dvui = .{
-            .url = "https://github.com/david-vanderson/gui/archive/3fc819137b9aa0ce5db5374a401a7ac84ffd49cf.tar.gz",
-            .hash = "122081cb539d49b752850b0f3350970ec3aadbaa04dc2317cf024e96a0ea88550f10",
+            .url = "https://github.com/david-vanderson/gui/archive/eaef1850b93c37ae710a21dd6948e8c590679731.tar.gz",
+            .hash = "12203b68dcca51d9ba017ff56087ed4be8868b9c629456726c91b4c361f033744ae1",
         },
-        .freetype = .{
-            .url = "https://github.com/david-vanderson/freetype/archive/18a1df5a3ef8afa0782c419b153a21e9e160335f.tar.gz",
-            .hash = "1220b305af272ac3026704b8d7e13740350daf59a6a95e45dedb428c55933e3df925",
-        },
-        //.stb_image = .{
-        //    .url = "https://github.com/david-vanderson/stb_image/archive/9a961327f5e67ec799bc9a6258d7abebb59d7028.tar.gz",
-        //    .hash = "1220e47cea6fd7a0098a1b0ac3e47a2c3b558dc3afb0a75c71d7b00e53936824287e",
-        //},
         .ffmpeg = .{
-            .url = "https://github.com/andrewrk/ffmpeg/archive/73ac2d6ce909854436a23a26a9f712861eec2b4e.tar.gz",
-            .hash = "1220e1674169be14f2d5c187f53e80247796c99fabf14aa290589b2a01a8021ae171",
+            .url = "https://github.com/andrewrk/ffmpeg/archive/1704e8898ea6217df91e6afc2a2de3f2b82a98d9.tar.gz",
+            .hash = "122032707cdf94da394e309978146ee33c61a285300eeb916928af376ec1638a95f1",
         },
         .curl = .{
-            .url = "https://github.com/david-vanderson/curl/archive/df1c5ab12817e73d31db186f313c8a2f05c1f97d.tar.gz",
-            .hash = "1220aec24f72c4c16da330b73da0836456da5e594940f92e5281613cbcd2de40ee40",
+            .url = "https://github.com/david-vanderson/curl/archive/b7c764a7b154cde09cc65f697d939aef38c202f5.tar.gz",
+            .hash = "1220d47752366cab3ac3dbb3b91fe8c174dd7a0a7ec69b1d29761b61855dddb7972a",
         },
         .libxml2 = .{
-            .url = "https://github.com/david-vanderson/libxml2/archive/d2341fd369f2eae370cb00d463caad3a6c722f87.tar.gz",
-            .hash = "1220328594fa1cc194ec03460ec946da09eb38a298b328bb147344bdc30d8a511fcd",
+            .url = "https://github.com/david-vanderson/libxml2/archive/d0cbcb28cf1297121e5c6d46773d877fdb3f7bb0.tar.gz",
+            .hash = "12206c22f9bec54882b4c07f602a1ea100cb3bee111b3e0b39a70f3db192be61f1a8",
+        },
+        .sqlite = .{
+            .url = "https://github.com/vrischmann/zig-sqlite/archive/fd17eb9a4ea35f515cc7c2e4755a3a5e284a0bd3.tar.gz",
+            .hash = "1220e0300613f2b949a8328c5b1d9ba84777f2258c1535039afcb536e9e1228d2881",
         },
     },
+    .paths = .{""},
 }

@@ -6,8 +6,6 @@ allow deleting whole podcasts
 
 when switching podcasts, reset episode scroll info
 
-store current position for each episode
-
 can zig-sqlite be used as a zig dependency?
 
 replace debug messages with toasts

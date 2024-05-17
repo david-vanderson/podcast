@@ -131,11 +131,11 @@ fn dbInit(arena: std.mem.Allocator) !void {
 }
 
 pub fn getContent(xpathCtx: *c.xmlXPathContext, node_name: [:0]const u8, attr_name: ?[:0]const u8) ?[]u8 {
-    var xpathObj = c.xmlXPathEval(node_name.ptr, xpathCtx);
+    const xpathObj = c.xmlXPathEval(node_name.ptr, xpathCtx);
     defer c.xmlXPathFreeObject(xpathObj);
     if (xpathObj.*.nodesetval.*.nodeNr >= 1) {
         if (attr_name) |attr| {
-            var data = c.xmlGetProp(xpathObj.*.nodesetval.*.nodeTab[0], attr.ptr);
+            const data = c.xmlGetProp(xpathObj.*.nodesetval.*.nodeTab[0], attr.ptr);
             return std.mem.sliceTo(data, 0);
         } else {
             return std.mem.sliceTo(xpathObj.*.nodesetval.*.nodeTab[0].*.children.*.content, 0);
@@ -275,7 +275,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
     } else {
         std.debug.print("  bgFetchFeed fetching {s}\n", .{url});
 
-        var easy = c.curl_easy_init() orelse return error.FailedInit;
+        const easy = c.curl_easy_init() orelse return error.FailedInit;
         defer c.curl_easy_cleanup(easy);
 
         const urlZ = try std.fmt.bufPrintZ(&buf, "{s}", .{url});
@@ -289,7 +289,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
         try tryCurl(c.curl_easy_setopt(easy, c.CURLOPT_WRITEFUNCTION, struct {
             fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
                 _ = size;
-                var slice = (ptr orelse return 0)[0..nmemb];
+                const slice = (ptr orelse return 0)[0..nmemb];
                 const fifo: *Fifo = @ptrCast(@alignCast(data orelse return 0));
 
                 fifo.writer().writeAll(slice) catch return 0;
@@ -327,12 +327,12 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
     const doc = c.xmlReadDoc(contents.ptr, null, null, 0);
     defer c.xmlFreeDoc(doc);
 
-    var xpathCtx = c.xmlXPathNewContext(doc);
+    const xpathCtx = c.xmlXPathNewContext(doc);
     defer c.xmlXPathFreeContext(xpathCtx);
     _ = c.xmlXPathRegisterNs(xpathCtx, "itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd");
 
     {
-        var xpathObj = c.xmlXPathEval("/rss/channel", xpathCtx);
+        const xpathObj = c.xmlXPathEval("/rss/channel", xpathCtx);
         defer c.xmlXPathFreeObject(xpathObj);
 
         if (xpathObj.*.nodesetval.*.nodeNr > 0) {
@@ -376,7 +376,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
     }
 
     {
-        var xpathObj = c.xmlXPathEval("//item", xpathCtx);
+        const xpathObj = c.xmlXPathEval("//item", xpathCtx);
         defer c.xmlXPathFreeObject(xpathObj);
 
         var i: usize = 0;
@@ -520,7 +520,7 @@ pub fn main() !void {
 
     var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_allocator.deinit();
-    var arena = arena_allocator.allocator();
+    const arena = arena_allocator.allocator();
     {
         dbInit(arena) catch |err| switch (err) {
             error.DB_ERROR => {},
@@ -557,7 +557,7 @@ pub fn main() !void {
     bgt.detach();
 
     main_loop: while (true) {
-        var nstime = g_win.beginWait(backend.hasEvent());
+        const nstime = g_win.beginWait(backend.hasEvent());
         try g_win.begin(nstime);
 
         const quit = try backend.addAllEvents(&g_win);
@@ -1113,7 +1113,7 @@ fn pause() void {
 
 export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) void {
     _ = user_data;
-    var len: usize = @intCast(length);
+    const len: usize = @intCast(length);
     var i: usize = 0;
 
     audio_mutex.lock();
@@ -1158,7 +1158,7 @@ fn playback_thread() !void {
 
     var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_allocator.deinit();
-    var arena = arena_allocator.allocator();
+    const arena = arena_allocator.allocator();
 
     stream: while (true) {
         // wait to play
@@ -1203,7 +1203,7 @@ fn playback_thread() !void {
 
         c.av_dump_format(avfc, 0, filename, 0);
 
-        var audio_stream_idx = c.av_find_best_stream(avfc, c.AVMEDIA_TYPE_AUDIO, -1, -1, null, 0);
+        const audio_stream_idx = c.av_find_best_stream(avfc, c.AVMEDIA_TYPE_AUDIO, -1, -1, null, 0);
         if (audio_stream_idx < 0) {
             _ = c.av_strerror(audio_stream_idx, &buf, 256);
             std.debug.print("av_find_best_stream err {d} : {s}\n", .{ audio_stream_idx, std.mem.sliceTo(&buf, 0) });
@@ -1258,7 +1258,7 @@ fn playback_thread() !void {
         defer c.av_frame_free(@ptrCast(&frame));
         var outframe: *c.AVFrame = c.av_frame_alloc();
         defer c.av_frame_free(@ptrCast(&outframe));
-        var pkt: *c.AVPacket = c.av_packet_alloc();
+        const pkt: *c.AVPacket = c.av_packet_alloc();
         var graph: ?*c.AVFilterGraph = null;
         var graph_src: ?*c.AVFilterContext = null;
         var graph_sink: ?*c.AVFilterContext = null;
@@ -1320,7 +1320,7 @@ fn playback_thread() !void {
                     }
                 }
 
-                var ret = c.avcodec_receive_frame(avctx, frame);
+                const ret = c.avcodec_receive_frame(avctx, frame);
                 // could return eagain if codec is empty, have to call send_packet to proceed
                 if (ret == c.AVERROR_EOF) {
                     std.debug.print("receive_frame eof\n", .{});
@@ -1402,7 +1402,7 @@ fn playback_thread() !void {
                         return;
                     }
 
-                    var dump = c.avfilter_graph_dump(graph, null);
+                    const dump = c.avfilter_graph_dump(graph, null);
                     std.debug.print("graph: \n{s}\n", .{dump});
 
                     c.avfilter_inout_free(&outputs);
@@ -1469,7 +1469,7 @@ fn bg_thread() !void {
     while (true) {
         var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena_allocator.deinit();
-        var arena = arena_allocator.allocator();
+        const arena = arena_allocator.allocator();
 
         bgtask_mutex.lock();
         while (bgtasks.items.len == 0) {
@@ -1500,7 +1500,7 @@ fn bg_thread() !void {
                 } else {
                     std.debug.print("downloading url {s}\n", .{episode.enclosure_url});
 
-                    var easy = c.curl_easy_init() orelse return error.FailedInit;
+                    const easy = c.curl_easy_init() orelse return error.FailedInit;
                     defer c.curl_easy_cleanup(easy);
 
                     const urlZ = try std.fmt.allocPrintZ(arena, "{s}", .{episode.enclosure_url});
@@ -1514,7 +1514,7 @@ fn bg_thread() !void {
                     try tryCurl(c.curl_easy_setopt(easy, c.CURLOPT_WRITEFUNCTION, struct {
                         fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
                             _ = size;
-                            var slice = (ptr orelse return 0)[0..nmemb];
+                            const slice = (ptr orelse return 0)[0..nmemb];
                             const fifo: *Fifo = @ptrCast(@alignCast(data orelse return 0));
 
                             fifo.writer().writeAll(slice) catch return 0;
