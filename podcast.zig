@@ -26,15 +26,19 @@ pub const c = @cImport({
     @cInclude("libavutil/opt.h");
 });
 
-// when set to true, looks for feed-{rowid}.xml and episode-{rowid}.mp3 instead
-// of fetching from network
-const DEBUG = false; //test
+// when set to true:
+// - looks for url-{hash}.xml file instead of fetching feed from network
+// - doesn't download episodes
+const DEBUG = false;
 
 var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
 const gpa = gpa_instance.allocator();
 
 const db_name = "podcast-db.sqlite3";
 var g_db: ?sqlite.Db = null;
+
+var g_arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+const g_arena = g_arena_allocator.allocator();
 
 var g_quit = false;
 
@@ -259,10 +263,14 @@ fn errorFromCurl(code: c.CURLcode) !void {
 }
 
 fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
-    var buf: [256]u8 = undefined;
     var contents: [:0]const u8 = undefined;
+
+    var h = std.hash.Fnv1a_32.init();
+    h.update(url);
+    const url_hash = h.final();
+    const filename = try std.fmt.allocPrint(arena, "url-{d}.xml", .{url_hash});
+
     if (DEBUG) {
-        const filename = try std.fmt.bufPrint(&buf, "feed-{d}.xml", .{rowid});
         std.debug.print("  bgFetchFeed fetching {s}\n", .{filename});
 
         const file = std.fs.cwd().openFile(filename, .{}) catch |err| switch (err) {
@@ -278,7 +286,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
         const easy = c.curl_easy_init() orelse return error.FailedInit;
         defer c.curl_easy_cleanup(easy);
 
-        const urlZ = try std.fmt.bufPrintZ(&buf, "{s}", .{url});
+        const urlZ = try std.fmt.allocPrintZ(arena, "{s}", .{url});
         try tryCurl(c.curl_easy_setopt(easy, c.CURLOPT_URL, urlZ.ptr));
         try tryCurl(c.curl_easy_setopt(easy, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, 0)));
         try tryCurl(c.curl_easy_setopt(easy, c.CURLOPT_ACCEPT_ENCODING, "gzip"));
@@ -313,7 +321,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
         const tempslice = fifo.readableSlice(0);
         contents = tempslice[0 .. tempslice.len - 1 :0];
 
-        const filename = try std.fmt.bufPrint(&buf, "feed-{d}.xml", .{rowid});
+        std.debug.print("  bgFetchFeed writing \"{s}\"\n", .{filename});
         const file = std.fs.cwd().createFile(filename, .{}) catch |err| switch (err) {
             error.FileNotFound => return,
             else => |e| return e,
@@ -321,7 +329,6 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
         defer file.close();
 
         try file.writeAll(contents);
-        //try file.sync();
     }
 
     const doc = c.xmlReadDoc(contents.ptr, null, null, 0);
@@ -355,6 +362,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
                 _ = c.setlocale(c.LC_ALL, "C");
                 var tm: c.struct_tm = undefined;
                 _ = c.strptime(str.ptr, "%a, %e %h %Y %H:%M:%S %z", &tm);
+                var buf: [256]u8 = undefined;
                 _ = c.strftime(&buf, buf.len, "%s", &tm);
                 _ = c.setlocale(c.LC_ALL, "");
 
@@ -439,6 +447,7 @@ fn bgFetchFeed(arena: std.mem.Allocator, rowid: u32, url: []const u8) !void {
                     _ = c.setlocale(c.LC_ALL, "C");
                     var tm: c.struct_tm = undefined;
                     _ = c.strptime(str.ptr, "%a, %e %h %Y %H:%M:%S %z", &tm);
+                    var buf: [256]u8 = undefined;
                     _ = c.strftime(&buf, buf.len, "%s", &tm);
                     _ = c.setlocale(c.LC_ALL, "");
 
@@ -477,7 +486,7 @@ fn bgUpdateFeed(arena: std.mem.Allocator, rowid: u32) !void {
     }
 }
 
-fn mainGui(arena: std.mem.Allocator) !void {
+fn mainGui() !void {
     //var float = dvui.floatingWindow(@src(), false, null, null, .{});
     //defer float.deinit();
 
@@ -492,13 +501,13 @@ fn mainGui(arena: std.mem.Allocator) !void {
         var paned = try dvui.paned(@src(), .{ .direction = .horizontal, .collapsed_size = 400 }, .{ .expand = .both, .background = false });
         const collapsed = paned.collapsed();
 
-        try podcastSide(arena, paned);
-        try episodeSide(arena, paned);
+        try podcastSide(paned);
+        try episodeSide(paned);
 
         paned.deinit();
 
         if (collapsed) {
-            try player(arena);
+            try player();
         }
     }
 }
@@ -518,15 +527,13 @@ pub fn main() !void {
     const pxSize = backend.pixelSize();
     std.debug.print("initial window logical {} pixels {} natural scale {d} initial content scale {d} snap_to_pixels {}\n", .{ winSize, pxSize, pxSize.w / winSize.w, backend.initial_scale, g_win.snap_to_pixels });
 
-    var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena_allocator.deinit();
-    const arena = arena_allocator.allocator();
+    defer g_arena_allocator.deinit();
     {
-        dbInit(arena) catch |err| switch (err) {
+        dbInit(g_arena) catch |err| switch (err) {
             error.DB_ERROR => {},
             else => return err,
         };
-        _ = arena_allocator.reset(.retain_capacity);
+        _ = g_arena_allocator.reset(.retain_capacity);
     }
 
     if (Backend.c.SDL_InitSubSystem(Backend.c.SDL_INIT_AUDIO) < 0) {
@@ -568,7 +575,7 @@ pub fn main() !void {
 
         //_ = dvui.examples.demo();
 
-        mainGui(arena) catch |err| switch (err) {
+        mainGui() catch |err| switch (err) {
             error.DB_ERROR => {},
             else => return err,
         };
@@ -583,19 +590,49 @@ pub fn main() !void {
 
         backend.waitEventTimeout(wait_event_micros);
 
-        _ = arena_allocator.reset(.retain_capacity);
+        _ = g_arena_allocator.reset(.retain_capacity);
+    }
+}
+
+fn deleteDialogDisplay(id: u32) !void {
+    _ = dvui.dataGet(null, id, "podcast_id", u32);
+    try dvui.dialogDisplay(id);
+}
+
+fn deleteDialogCallafter(id: u32, response: dvui.enums.DialogResponse) !void {
+    const podcast_id = dvui.dataGet(null, id, "podcast_id", u32) orelse {
+        dvui.log.err("deleteDialogDisplay lost data for dialog {x}\n", .{id});
+        dvui.dialogRemove(id);
+        return;
+    };
+    if (response == .ok) {
+        _ = try dbRow(g_arena, "DELETE FROM podcast WHERE rowid = ?", u8, .{@as(u32, podcast_id)});
+        _ = try dbRow(g_arena, "DELETE FROM episode WHERE podcast_id = ?", u8, .{@as(u32, podcast_id)});
+        var buf: [100]u8 = undefined;
+        try dvui.toast(@src(), .{ .message = std.fmt.bufPrint(&buf, "deleted podcast {d}", .{podcast_id}) catch unreachable });
     }
 }
 
 var add_rss_dialog: bool = false;
+var delete_mode: bool = false;
 
-fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
+fn podcastSide(paned: *dvui.PanedWidget) !void {
     var b = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer b.deinit();
 
     {
-        var overlay = try dvui.overlay(@src(), .{ .expand = .horizontal });
-        defer overlay.deinit();
+        var hb = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal });
+        defer hb.deinit();
+
+        const height = 8 + (dvui.themeGet().font_body.lineHeight() catch 12);
+        if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, (if (delete_mode) dvui.themeGet().style_err else dvui.Options{}).override(.{
+            .min_size_content = .{ .h = height },
+        }))) {
+            delete_mode = !delete_mode;
+        }
+
+        const label_width = (dvui.themeGet().font_body.textSize("fps 12") catch dvui.Size{}).w;
+        try dvui.label(@src(), "fps {d}", .{@round(dvui.FPS())}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = label_width } });
 
         {
             var menu = try dvui.menu(@src(), .horizontal, .{ .gravity_x = 1.0 });
@@ -620,7 +657,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                         defer stmt.deinit();
 
                         var iter = try stmt.iterator(u32, .{});
-                        while (try iter.nextAlloc(arena, .{})) |rowid| {
+                        while (try iter.nextAlloc(g_arena, .{})) |rowid| {
                             bgtask_mutex.lock();
                             try bgtasks.append(.{ .kind = .update_feed, .rowid = @as(u32, @intCast(rowid)) });
                             bgtask_mutex.unlock();
@@ -633,8 +670,6 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 }
             }
         }
-
-        try dvui.label(@src(), "fps {d}", .{@round(dvui.FPS())}, .{ .gravity_y = 0.5 });
     }
 
     if (add_rss_dialog) {
@@ -659,11 +694,11 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
         if (try dvui.button(@src(), "Ok", .{}, .{})) {
             dialog.close();
             const url = std.mem.trim(u8, &TextEntryText.text, " \x00");
-            const row = try dbRow(arena, "SELECT rowid FROM podcast WHERE url = ?", i32, .{url});
+            const row = try dbRow(g_arena, "SELECT rowid FROM podcast WHERE url = ?", i32, .{url});
             if (row) |_| {
-                try dvui.dialog(@src(), .{ .title = "Note", .message = try std.fmt.allocPrint(arena, "url already in db:\n\n{s}", .{url}) });
+                try dvui.dialog(@src(), .{ .title = "Note", .message = try std.fmt.allocPrint(g_arena, "url already in db:\n\n{s}", .{url}) });
             } else {
-                _ = try dbRow(arena, "INSERT INTO podcast (url, speed) VALUES (?, 1.0)", i32, .{url});
+                _ = try dbRow(g_arena, "INSERT INTO podcast (url, speed) VALUES (?, 1.0)", i32, .{url});
                 if (g_db) |*db| {
                     const rowid = db.getLastInsertRowID();
                     bgtask_mutex.lock();
@@ -681,7 +716,7 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
     var scroll = try dvui.scrollArea(@src(), .{}, .{ .expand = .both, .background = false });
 
     if (g_db) |*db| {
-        const num_podcasts = try dbRow(arena, "SELECT count(*) FROM podcast", usize, .{});
+        const num_podcasts = try dbRow(g_arena, "SELECT count(*) FROM podcast", usize, .{});
 
         const query = "SELECT rowid FROM podcast";
         var stmt = db.prepare(query) catch {
@@ -692,16 +727,16 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
 
         var iter = try stmt.iterator(u32, .{});
         var i: usize = 1;
-        while (try iter.nextAlloc(arena, .{})) |rowid| {
+        while (try iter.nextAlloc(g_arena, .{})) |rowid| {
             defer i += 1;
 
-            const title = try dbRow(arena, "SELECT title FROM podcast WHERE rowid=?", []const u8, .{rowid}) orelse "Error: No Title";
+            const title = try dbRow(g_arena, "SELECT title FROM podcast WHERE rowid=?", []const u8, .{rowid}) orelse "Error: No Title";
             var margin: dvui.Rect = .{ .x = 8, .y = 0, .w = 8, .h = 0 };
             var border: dvui.Rect = .{ .x = 1, .y = 0, .w = 1, .h = 0 };
             var corner = dvui.Rect.all(0);
 
             if (i != 1) {
-                try dvui.separator(@src(), .{ .id_extra = i, .margin = margin, .expand = .horizontal });
+                border.y = 1;
             }
 
             if (i == 1) {
@@ -718,8 +753,38 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                 corner.h = 9;
             }
 
-            var box = try dvui.box(@src(), .horizontal, .{ .id_extra = i, .expand = .horizontal });
+            var box = try dvui.box(@src(), .horizontal, .{
+                .id_extra = i,
+                .expand = .horizontal,
+                .margin = margin,
+                .border = border,
+                .background = true,
+                .corner_radius = corner,
+                .color_fill = .{ .name = .fill },
+                .min_size_content = .{ .h = 40 },
+            });
             defer box.deinit();
+
+            const height = 8 + (dvui.themeGet().font_body.lineHeight() catch 12);
+            if (delete_mode) {
+                if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, .{
+                    .min_size_content = .{ .h = height },
+                    .gravity_y = 0.5,
+                })) {
+                    const num_episodes = (try dbRow(g_arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", u32, .{rowid})).?;
+
+                    const id_mutex = try dvui.dialogAdd(null, @src(), 0, deleteDialogDisplay);
+                    const id = id_mutex.id;
+                    dvui.dataSet(null, id, "_modal", true);
+                    dvui.dataSetSlice(null, id, "_title", @as([]const u8, "Delete Podcast?"));
+                    dvui.dataSetSlice(null, id, "_message", try std.fmt.allocPrint(g_arena, "Delete podcast \"{s}\" and all {d} episodes?", .{ title, num_episodes }));
+                    dvui.dataSetSlice(null, id, "_ok_label", @as([]const u8, "Delete"));
+                    dvui.dataSetSlice(null, id, "_cancel_label", @as([]const u8, "Cancel"));
+                    dvui.dataSet(null, id, "_callafter", @as(dvui.DialogCallAfterFn, deleteDialogCallafter));
+                    dvui.dataSet(null, id, "podcast_id", rowid);
+                    id_mutex.mutex.unlock();
+                }
+            }
 
             bgtask_mutex.lock();
             defer bgtask_mutex.unlock();
@@ -728,11 +793,10 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                     var m = margin;
                     m.w = 0;
                     margin.x = 0;
-                    const height = 8 + (dvui.themeGet().font_body.lineHeight() catch 12);
                     if (try dvui.buttonIcon(@src(), "cancel_refresh", dvui.entypo.circle_with_cross, .{}, .{
                         .min_size_content = .{ .h = height },
-                        .margin = m,
                         .rotation = std.math.pi * @as(f32, @floatFromInt(@mod(@divFloor(dvui.frameTimeNS(), 1_000_000), 1000))) / 1000,
+                        .gravity_y = 0.5,
                     })) {
                         // TODO: cancel task
                     }
@@ -743,12 +807,9 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
             }
 
             if (try dvui.button(@src(), title, .{}, .{
-                .id_extra = i,
-                .margin = margin,
-                .border = border,
+                .margin = .{},
                 .corner_radius = corner,
-                .padding = dvui.Rect.all(8),
-                .expand = .horizontal,
+                .expand = .both,
                 .color_fill = .{ .name = .fill },
             })) {
                 g_podcast_id_on_right = rowid;
@@ -762,11 +823,11 @@ fn podcastSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
     scroll.deinit();
 
     if (!paned.collapsed()) {
-        try player(arena);
+        try player();
     }
 }
 
-fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
+fn episodeSide(paned: *dvui.PanedWidget) !void {
     var b = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer b.deinit();
 
@@ -781,7 +842,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
     }
 
     if (g_db) |*db| {
-        const num_episodes = try dbRow(arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", usize, .{g_podcast_id_on_right}) orelse 0;
+        const num_episodes = try dbRow(g_arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", usize, .{g_podcast_id_on_right}) orelse 0;
         const height: f32 = 150;
 
         const tmpId = dvui.parentGet().extendId(@src(), 0);
@@ -805,7 +866,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
         var cursor: f32 = 0;
 
         var iter = try stmt.iterator(Episode, .{g_podcast_id_on_right});
-        while (try iter.nextAlloc(arena, .{})) |episode| {
+        while (try iter.nextAlloc(g_arena, .{})) |episode| {
             defer cursor += height;
             const r = dvui.Rect{ .x = 0, .y = cursor, .w = 0, .h = height };
             if (visibleRect.intersect(r).h > 0) {
@@ -815,15 +876,15 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
 
                 var cbox = try dvui.box(@src(), .vertical, .{ .gravity_x = 1.0 });
 
-                const filename = try std.fmt.allocPrint(arena, "episode_{d}.aud", .{episode.rowid});
+                const filename = try std.fmt.allocPrint(g_arena, "episode_{d}.aud", .{episode.rowid});
                 const file = std.fs.cwd().openFile(filename, .{}) catch null;
 
                 if (try dvui.buttonIcon(@src(), "play", dvui.entypo.controller_play, .{}, .{ .padding = dvui.Rect.all(6), .min_size_content = .{ .h = 18 } })) {
                     if (file == null) {
                         // TODO: make the play button disabled, and if you click it, it puts this out as a toast
-                        try dvui.dialog(@src(), .{ .title = "Error", .message = try std.fmt.allocPrint(arena, "Must download first", .{}) });
+                        try dvui.dialog(@src(), .{ .title = "Error", .message = try std.fmt.allocPrint(g_arena, "Must download first", .{}) });
                     } else {
-                        _ = try dbRow(arena, "UPDATE player SET episode_id=?", u8, .{episode.rowid});
+                        _ = try dbRow(g_arena, "UPDATE player SET episode_id=?", u8, .{episode.rowid});
                         audio_mutex.lock();
                         stream_new = true;
                         stream_seek_time = episode.position;
@@ -844,7 +905,7 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
                     if (try dvui.buttonIcon(@src(), "delete", dvui.entypo.trash, .{}, .{ .padding = dvui.Rect.all(6), .min_size_content = .{ .h = 18 } })) {
                         std.fs.cwd().deleteFile(filename) catch |err| {
                             // TODO: make this a toast
-                            try dvui.dialog(@src(), .{ .title = "Delete Error", .message = try std.fmt.allocPrint(arena, "error {!}\ntrying to delete file:\n{s}", .{ err, filename }) });
+                            try dvui.dialog(@src(), .{ .title = "Delete Error", .message = try std.fmt.allocPrint(g_arena, "error {!}\ntrying to delete file:\n{s}", .{ err, filename }) });
                         };
                     }
                 } else {
@@ -896,15 +957,15 @@ fn episodeSide(arena: std.mem.Allocator, paned: *dvui.PanedWidget) !void {
     }
 }
 
-fn player(arena: std.mem.Allocator) !void {
+fn player() !void {
     var box = try dvui.box(@src(), .vertical, .{ .expand = .horizontal, .background = true });
     defer box.deinit();
 
     var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0, .pubDate = 0 };
 
-    const episode_id = try dbRow(arena, "SELECT episode_id FROM player", i32, .{});
+    const episode_id = try dbRow(g_arena, "SELECT episode_id FROM player", i32, .{});
     if (episode_id) |id| {
-        episode = try dbRow(arena, Episode.query_one, Episode, .{id}) orelse episode;
+        episode = try dbRow(g_arena, Episode.query_one, Episode, .{id}) orelse episode;
     }
 
     try dvui.label(@src(), "{s}", .{episode.title}, .{
@@ -917,7 +978,7 @@ fn player(arena: std.mem.Allocator) !void {
 
     if (current_time > episode.duration) {
         //std.debug.print("updating episode {d} duration to {d}\n", .{ episode.rowid, current_time });
-        _ = dbRow(arena, "UPDATE episode SET duration=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
+        _ = dbRow(g_arena, "UPDATE episode SET duration=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
     }
 
     var percent: f32 = @floatCast(current_time / episode.duration);
@@ -953,7 +1014,7 @@ fn player(arena: std.mem.Allocator) !void {
 
             var speed: f32 = 1.0;
             if (episode_id) |_| {
-                speed = try dbRow(arena, "SELECT speed FROM podcast WHERE rowid = ?", f32, .{episode.podcast_id}) orelse 1.0;
+                speed = try dbRow(g_arena, "SELECT speed FROM podcast WHERE rowid = ?", f32, .{episode.podcast_id}) orelse 1.0;
                 if (speed == 0) speed = 1.0;
                 speed = @min(2.0, @max(0.5, speed));
             }
@@ -963,7 +1024,7 @@ fn player(arena: std.mem.Allocator) !void {
             if (try dvui.buttonIcon(@src(), "speed down", dvui.entypo.minus, .{}, .{ .min_size_content = .{ .h = 18 } })) {
                 speed -= 0.1;
                 speed = @max(0.5, speed);
-                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+                _ = dbRow(g_arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
             }
 
             const entries = [_][]const u8{
@@ -988,13 +1049,13 @@ fn player(arena: std.mem.Allocator) !void {
 
             if (try dvui.dropdown(@src(), &entries, &choice, .{ .expand = .vertical, .min_size_content = .{ .w = 50 } })) {
                 speed = 0.5 + 0.1 * @as(f32, @floatFromInt(choice));
-                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+                _ = dbRow(g_arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
             }
 
             if (try dvui.buttonIcon(@src(), "speed up", dvui.entypo.plus, .{}, .{ .min_size_content = .{ .h = 18 } })) {
                 speed += 0.1;
                 speed = @min(2.0, speed);
-                _ = dbRow(arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
+                _ = dbRow(g_arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
             }
 
             _ = dvui.spacer(@src(), .{}, .{ .expand = .horizontal });
@@ -1055,7 +1116,7 @@ fn player(arena: std.mem.Allocator) !void {
 
     if (episode.position != current_time) {
         //std.debug.print("updating episode {d} position to {d}\n", .{ episode.rowid, current_time });
-        _ = dbRow(arena, "UPDATE episode SET position=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
+        _ = dbRow(g_arena, "UPDATE episode SET position=? WHERE rowid=?", i32, .{ current_time, episode.rowid }) catch {};
     }
 
     if (playing) {
