@@ -6,14 +6,13 @@ pub fn build(b: *std.Build) !void {
 
     const exe = b.addExecutable(.{
         .name = "podcast",
-        .root_source_file = .{ .path = "podcast" ++ ".zig" },
+        .root_source_file = b.path("podcast" ++ ".zig"),
         .target = target,
         .optimize = optimize,
     });
 
     const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("dvui", dvui_dep.module("dvui"));
-    exe.root_module.addImport("SDLBackend", dvui_dep.module("SDLBackend"));
+    exe.root_module.addImport("dvui", dvui_dep.module("dvui_sdl"));
 
     const sqlite = b.dependency("sqlite", .{
         .target = target,

@@ -8,16 +8,16 @@
             .path = "../dvui",
         },
         .ffmpeg = .{
-            .url = "https://github.com/andrewrk/ffmpeg/archive/1704e8898ea6217df91e6afc2a2de3f2b82a98d9.tar.gz",
+            .url = "https://github.com/andrewrk/ffmpeg/archive/e19268538b4da2a740228808d475c4a925cd8658.tar.gz",
             .hash = "122032707cdf94da394e309978146ee33c61a285300eeb916928af376ec1638a95f1",
         },
         .curl = .{
-            .url = "https://github.com/david-vanderson/curl/archive/b7c764a7b154cde09cc65f697d939aef38c202f5.tar.gz",
-            .hash = "1220d47752366cab3ac3dbb3b91fe8c174dd7a0a7ec69b1d29761b61855dddb7972a",
+            .url = "https://github.com/david-vanderson/curl/archive/598eb4b2f09ac897ce4516cb0643233c52a629f5.tar.gz",
+            .hash = "1220db05b237f76b76d8f382fe11b0e092a3a6927f5873d0aca0ab4450ce23801491",
         },
         .libxml2 = .{
-            .url = "https://github.com/david-vanderson/libxml2/archive/d0cbcb28cf1297121e5c6d46773d877fdb3f7bb0.tar.gz",
-            .hash = "12206c22f9bec54882b4c07f602a1ea100cb3bee111b3e0b39a70f3db192be61f1a8",
+            .url = "https://github.com/david-vanderson/libxml2/archive/92fb668b5c3d3928a80c87401b0858f968dd62d5.tar.gz",
+            .hash = "1220cfeaaa6b57ea468d047c69b482549cc09fe002c10d3cf1ec21e1f3e264443b9c",
         },
         .sqlite = .{
             .url = "https://github.com/vrischmann/zig-sqlite/archive/fd17eb9a4ea35f515cc7c2e4755a3a5e284a0bd3.tar.gz",

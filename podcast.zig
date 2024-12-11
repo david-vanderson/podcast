@@ -1,6 +1,6 @@
 const std = @import("std");
 const dvui = @import("dvui");
-const Backend = @import("SDLBackend");
+const Backend = dvui.backend;
 
 const sqlite = @import("sqlite");
 
@@ -128,7 +128,7 @@ fn dbInit(arena: std.mem.Allocator) !void {
         // new database
         _ = try dbRow(arena, "INSERT INTO schema (version) VALUES (1)", u8, .{});
         _ = try dbRow(arena, "CREATE TABLE podcast (url TEXT, title TEXT, description TEXT, copyright TEXT, pubDate INTEGER, lastBuildDate TEXT, link TEXT, image_url TEXT, speed REAL)", u8, .{});
-        _ = try dbRow(arena, "CREATE TABLE episode (podcast_id INTEGER, visible INTEGER DEFAULT 1, dvuid TEXT, title TEXT, description TEXT, pubDate INTEGER, enclosure_url TEXT, position REAL, duration REAL)", u8, .{});
+        _ = try dbRow(arena, "CREATE TABLE episode (podcast_id INTEGER, visible INTEGER DEFAULT 1, guid TEXT, title TEXT, description TEXT, pubDate INTEGER, enclosure_url TEXT, position REAL, duration REAL)", u8, .{});
         _ = try dbRow(arena, "CREATE TABLE player (episode_id INTEGER)", u8, .{});
         _ = try dbRow(arena, "INSERT INTO player (episode_id) values (0)", u8, .{});
     }
@@ -513,14 +513,16 @@ fn mainGui() !void {
 }
 
 pub fn main() !void {
-    var backend = try Backend.init(.{
-        .size = .{ .w = 360, .h = 600 },
+    var backend = try Backend.initWindow(.{
+        .allocator = gpa,
+        .size = .{ .w = 360.0, .h = 600.0 },
         .vsync = true,
         .title = "Podcast",
+        //.icon = window_icon_png, // can also call setIconFromFileContent()
     });
     defer backend.deinit();
 
-    g_win = try dvui.Window.init(@src(), 0, gpa, backend.backend());
+    g_win = try dvui.Window.init(@src(), gpa, backend.backend(), .{});
     defer g_win.deinit();
 
     const winSize = backend.windowSize();
@@ -571,7 +573,8 @@ pub fn main() !void {
         if (quit) break :main_loop;
         if (g_quit) break :main_loop;
 
-        backend.clear();
+        _ = Backend.c.SDL_SetRenderDrawColor(backend.renderer, 0, 0, 0, 255);
+        _ = Backend.c.SDL_RenderClear(backend.renderer);
 
         //_ = dvui.examples.demo();
 
@@ -624,7 +627,7 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
         var hb = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal });
         defer hb.deinit();
 
-        const height = 8 + (dvui.themeGet().font_body.lineHeight() catch 12);
+        const height = 8 + dvui.themeGet().font_body.lineHeight();
         if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, (if (delete_mode) dvui.themeGet().style_err else dvui.Options{}).override(.{
             .min_size_content = .{ .h = height },
         }))) {
@@ -642,12 +645,12 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
                 var fw = try dvui.floatingMenu(@src(), dvui.Rect.fromPoint(dvui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
                 if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{ .expand = .horizontal })) |_| {
-                    dvui.menuGet().?.close();
+                    menu.close();
                     add_rss_dialog = true;
                 }
 
                 if (try dvui.menuItemLabel(@src(), "Update All", .{}, .{ .expand = .horizontal })) |_| {
-                    dvui.menuGet().?.close();
+                    menu.close();
                     if (g_db) |*db| {
                         const query = "SELECT rowid FROM podcast";
                         var stmt = db.prepare(query) catch {
@@ -683,7 +686,7 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
         };
 
         const msize = dvui.TextEntryWidget.defaults.fontGet().textSize("M") catch unreachable;
-        var te = try dvui.textEntry(@src(), .{ .text = &TextEntryText.text }, .{ .gravity_x = 0.5, .gravity_y = 0.5, .min_size_content = .{ .w = msize.w * 26.0, .h = msize.h } });
+        var te = try dvui.textEntry(@src(), .{ .text = .{ .buffer = &TextEntryText.text } }, .{ .gravity_x = 0.5, .gravity_y = 0.5, .min_size_content = .{ .w = msize.w * 26.0, .h = msize.h } });
         if (dvui.firstFrame(te.data().id)) {
             dvui.focusWidget(te.wd.id, null, null);
         }
@@ -765,7 +768,7 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
             });
             defer box.deinit();
 
-            const height = 8 + (dvui.themeGet().font_body.lineHeight() catch 12);
+            const height = 8 + dvui.themeGet().font_body.lineHeight();
             if (delete_mode) {
                 if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, .{
                     .min_size_content = .{ .h = height },
@@ -961,7 +964,7 @@ fn player() !void {
     var box = try dvui.box(@src(), .vertical, .{ .expand = .horizontal, .background = true });
     defer box.deinit();
 
-    var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 0, .pubDate = 0 };
+    var episode = Episode{ .rowid = 0, .podcast_id = 0, .title = "Episode Title", .description = "", .enclosure_url = "", .position = 0, .duration = 1, .pubDate = 0 };
 
     const episode_id = try dbRow(g_arena, "SELECT episode_id FROM player", i32, .{});
     if (episode_id) |id| {
@@ -1010,7 +1013,7 @@ fn player() !void {
             var box4 = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal });
             defer box4.deinit();
 
-            _ = dvui.spacer(@src(), .{}, .{ .expand = .horizontal });
+            _ = try dvui.spacer(@src(), .{}, .{ .expand = .horizontal });
 
             var speed: f32 = 1.0;
             if (episode_id) |_| {
@@ -1058,7 +1061,7 @@ fn player() !void {
                 _ = dbRow(g_arena, "UPDATE podcast SET speed=? WHERE rowid=?", i32, .{ speed, episode.podcast_id }) catch {};
             }
 
-            _ = dvui.spacer(@src(), .{}, .{ .expand = .horizontal });
+            _ = try dvui.spacer(@src(), .{}, .{ .expand = .horizontal });
 
             if (current_speed != speed) {
                 current_speed = speed;
@@ -1124,7 +1127,7 @@ fn player() !void {
         const millis = @divFloor(dvui.frameTimeNS(), 1_000_000);
         const left: i32 = @intCast(@rem(millis, 1000));
 
-        if (dvui.timerDone(timerId) or !dvui.timerExists(timerId)) {
+        if (dvui.timerDoneOrNone(timerId)) {
             const wait = 1000 * (1000 - left);
             try dvui.timer(timerId, wait);
         }
