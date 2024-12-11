@@ -8,8 +8,8 @@
             .path = "../dvui",
         },
         .ffmpeg = .{
-            .url = "https://github.com/andrewrk/ffmpeg/archive/e19268538b4da2a740228808d475c4a925cd8658.tar.gz",
-            .hash = "122032707cdf94da394e309978146ee33c61a285300eeb916928af376ec1638a95f1",
+            .url = "https://github.com/andrewrk/ffmpeg/archive/8836b829d3cfaf31ec7eaa15eeca84f065bcc423.tar.gz",
+            .hash = "1220b5d387335cb76a0eda4ab3e3c9ed153cbc3d1b5bb63c4899b5dfab3f826f4413",
         },
         .curl = .{
             .url = "https://github.com/david-vanderson/curl/archive/598eb4b2f09ac897ce4516cb0643233c52a629f5.tar.gz",
