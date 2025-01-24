@@ -538,24 +538,22 @@ pub fn main() !void {
         _ = g_arena_allocator.reset(.retain_capacity);
     }
 
-    if (Backend.c.SDL_InitSubSystem(Backend.c.SDL_INIT_AUDIO) < 0) {
+    if (!Backend.c.SDL_InitSubSystem(Backend.c.SDL_INIT_AUDIO)) {
         std.debug.print("Couldn't initialize SDL audio: {s}\n", .{Backend.c.SDL_GetError()});
         return error.BackendError;
     }
 
-    var wanted_spec = std.mem.zeroes(Backend.c.SDL_AudioSpec);
-    wanted_spec.freq = 44100;
-    wanted_spec.format = Backend.c.AUDIO_S16SYS;
-    wanted_spec.channels = 2;
-    wanted_spec.callback = audio_callback;
+    audio_spec.freq = 44100;
+    audio_spec.format = Backend.c.SDL_AUDIO_S16;
+    audio_spec.channels = 2;
 
-    audio_device = Backend.c.SDL_OpenAudioDevice(null, 0, &wanted_spec, &audio_spec, 0);
-    if (audio_device <= 1) {
+    audio_device = Backend.c.SDL_OpenAudioDeviceStream(Backend.c.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, audio_callback, null) orelse {
         std.debug.print("SDL_OpenAudioDevice error: {s}\n", .{Backend.c.SDL_GetError()});
         return error.BackendError;
-    }
+    };
+    defer Backend.c.SDL_DestroyAudioStream(audio_device);
 
-    std.debug.print("audio device {d} spec: {}\n", .{ audio_device, audio_spec });
+    std.debug.print("audio spec: {}\n", .{audio_spec});
 
     const pt = try std.Thread.spawn(.{}, playback_thread, .{});
     pt.detach();
@@ -1138,7 +1136,7 @@ fn player() !void {
 // all of these variables are protected by audio_mutex
 var audio_mutex = std.Thread.Mutex{};
 var audio_condition = std.Thread.Condition{};
-var audio_device: u32 = undefined;
+var audio_device: *Backend.c.SDL_AudioStream = undefined;
 var audio_spec: Backend.c.SDL_AudioSpec = undefined;
 var playing = false;
 var stream_new = true;
@@ -1158,7 +1156,7 @@ fn play() void {
         return;
     }
 
-    Backend.c.SDL_PauseAudioDevice(audio_device, 0);
+    _ = Backend.c.SDL_ResumeAudioStreamDevice(audio_device);
     playing = true;
     audio_condition.signal();
 }
@@ -1171,13 +1169,13 @@ fn pause() void {
         return;
     }
 
-    Backend.c.SDL_PauseAudioDevice(audio_device, 1);
+    _ = Backend.c.SDL_PauseAudioStreamDevice(audio_device);
     playing = false;
 }
 
-export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) void {
+export fn audio_callback(user_data: ?*anyopaque, stream: ?*Backend.c.SDL_AudioStream, additional: c_int, _: c_int) void {
     _ = user_data;
-    const len: usize = @intCast(length);
+    const len: usize = @intCast(additional);
     var i: usize = 0;
 
     audio_mutex.lock();
@@ -1185,10 +1183,12 @@ export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) 
 
     while (i < len and buffer.readableLength() > 0) {
         const size = @min(len - i, buffer.readableSlice(0).len);
-        for (buffer.readableSlice(0)[0..size]) |s| {
-            stream[i] = s;
-            i += 1;
-        }
+        _ = Backend.c.SDL_PutAudioStreamData(stream.?, buffer.readableSlice(0).ptr, @intCast(size));
+        i += size;
+        //for (buffer.readableSlice(0)[0..size]) |s| {
+        //stream[i] = s;
+        //i += 1;
+        //}
         buffer.discard(size);
         current_time = buffer_last_time - (@as(f64, @floatFromInt(buffer.readableLength())) / @as(f64, @floatFromInt(audio_spec.freq * 2 * 2)));
 
@@ -1199,10 +1199,10 @@ export fn audio_callback(user_data: ?*anyopaque, stream: [*c]u8, length: c_int) 
     }
 
     if (i < len) {
-        while (i < len) {
-            stream[i] = audio_spec.silence;
-            i += 1;
-        }
+        //while (i < len) {
+        //stream[i] = audio_spec.silence;
+        //i += 1;
+        //}
 
         if (buffer_eof) {
             // played all the way to the end

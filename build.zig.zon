@@ -3,9 +3,8 @@
     .version = "0.0.1",
     .dependencies = .{
         .dvui = .{
-            //.url = "https://github.com/david-vanderson/gui/archive/2f82109adf794977d4bca7643377a202bd2b83af.tar.gz",
-            //.hash = "1220bfd82e3db383cbe0e70e8771064a1d383873c8f18735562adad076ead8b110b8",
-            .path = "../dvui",
+            .url = "https://github.com/david-vanderson/gui/archive/29e3a0b8e071b74656906b99bc1d2410e2eeecf5.tar.gz",
+            .hash = "122044e22bc953f8f4653110dcb702653bdd4d43c2284e2868d8ba7c3290dab2bdaf",
         },
         .ffmpeg = .{
             .url = "https://github.com/andrewrk/ffmpeg/archive/8836b829d3cfaf31ec7eaa15eeca84f065bcc423.tar.gz",

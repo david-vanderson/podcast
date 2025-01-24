@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize });
+    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize, .sdl3 = true });
     exe.root_module.addImport("dvui", dvui_dep.module("dvui_sdl"));
 
     const sqlite = b.dependency("sqlite", .{
