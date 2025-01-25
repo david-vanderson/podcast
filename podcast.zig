@@ -976,6 +976,7 @@ fn player() !void {
     });
 
     audio_mutex.lock();
+    defer audio_mutex.unlock();
 
     if (current_time > episode.duration) {
         //std.debug.print("updating episode {d} duration to {d}\n", .{ episode.rowid, current_time });
@@ -1130,7 +1131,6 @@ fn player() !void {
             try dvui.timer(timerId, wait);
         }
     }
-    audio_mutex.unlock();
 }
 
 // all of these variables are protected by audio_mutex
@@ -1156,9 +1156,13 @@ fn play() void {
         return;
     }
 
-    _ = Backend.c.SDL_ResumeAudioStreamDevice(audio_device);
     playing = true;
     audio_condition.signal();
+
+    // see comment above audio_callback
+    audio_mutex.unlock();
+    _ = Backend.c.SDL_ResumeAudioStreamDevice(audio_device);
+    audio_mutex.lock();
 }
 
 // must hold audio_mutex when calling this
@@ -1168,11 +1172,19 @@ fn pause() void {
         std.debug.print("already paused\n", .{});
         return;
     }
-
-    _ = Backend.c.SDL_PauseAudioStreamDevice(audio_device);
     playing = false;
+
+    // see comment above audio_callback
+    audio_mutex.unlock();
+    _ = Backend.c.SDL_PauseAudioStreamDevice(audio_device);
+    audio_mutex.lock();
 }
 
+// Locking: SDL locks the stream during audio_callback, and also locks it
+// inside SDL_PauseAudioStreamDevice/SDL_ResumeAudioStreamDevice.  So we'll
+// deadlock if play/pause is run (on a separate thread) while audio_callback is
+// waiting to lock audio_mutex.  Calling pause inside audio_callback is okay
+// because SDL's locks can nest (but only on a single thread).
 export fn audio_callback(user_data: ?*anyopaque, stream: ?*Backend.c.SDL_AudioStream, additional: c_int, _: c_int) void {
     _ = user_data;
     const len: usize = @intCast(additional);
