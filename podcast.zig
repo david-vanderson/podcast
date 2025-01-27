@@ -639,7 +639,7 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
             var menu = try dvui.menu(@src(), .horizontal, .{ .gravity_x = 1.0 });
             defer menu.deinit();
 
-            if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .none, .min_size_content = .{ .h = 14 } })) |r| {
+            if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .none, .min_size_content = .{ .h = height } })) |r| {
                 var fw = try dvui.floatingMenu(@src(), dvui.Rect.fromPoint(dvui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
                 if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{ .expand = .horizontal })) |_| {
@@ -1141,7 +1141,7 @@ var audio_spec: Backend.c.SDL_AudioSpec = undefined;
 var playing = false;
 var stream_new = true;
 var stream_seek_time: ?f64 = null;
-var buffer = std.fifo.LinearFifo(u8, .{ .Static = std.math.pow(usize, 2, 20) }).init();
+var buffer = std.fifo.LinearFifo(u8, .{ .Static = 10 * std.math.pow(usize, 2, 20) }).init();
 var buffer_eof = false;
 var stream_timebase: f64 = 1.0;
 var buffer_last_time: f64 = 0;
