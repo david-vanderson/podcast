@@ -523,6 +523,7 @@ pub fn main() !void {
     defer backend.deinit();
 
     g_win = try dvui.Window.init(@src(), gpa, backend.backend(), .{});
+    g_win.snap_to_pixels = true;
     defer g_win.deinit();
 
     const winSize = backend.windowSize();
