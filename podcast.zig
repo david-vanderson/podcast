@@ -585,6 +585,7 @@ pub fn main() !void {
         const end_micros = try g_win.end(.{});
 
         backend.setCursor(g_win.cursorRequested());
+        backend.textInputRect(g_win.textInputRequested());
 
         backend.renderPresent();
 
