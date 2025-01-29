@@ -619,17 +619,19 @@ fn deleteDialogCallafter(id: u32, response: dvui.enums.DialogResponse) !void {
 var add_rss_dialog: bool = false;
 var delete_mode: bool = false;
 
+const top_bar_height = 40;
+
 fn podcastSide(paned: *dvui.PanedWidget) !void {
     var b = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer b.deinit();
 
     {
-        var hb = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal });
+        var hb = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .min_size_content = .{ .h = top_bar_height } });
         defer hb.deinit();
 
-        const height = 8 + dvui.themeGet().font_body.lineHeight();
         if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, (if (delete_mode) dvui.themeGet().style_err else dvui.Options{}).override(.{
-            .min_size_content = .{ .h = height },
+            .expand = .ratio,
+            .margin = .{},
         }))) {
             delete_mode = !delete_mode;
         }
@@ -638,10 +640,10 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
         try dvui.label(@src(), "fps {d}", .{@round(dvui.FPS())}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = label_width } });
 
         {
-            var menu = try dvui.menu(@src(), .horizontal, .{ .gravity_x = 1.0 });
+            var menu = try dvui.menu(@src(), .horizontal, .{ .gravity_x = 1.0, .expand = .vertical });
             defer menu.deinit();
 
-            if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .none, .min_size_content = .{ .h = height } })) |r| {
+            if (try dvui.menuItemIcon(@src(), "menu", dvui.entypo.menu, .{ .submenu = true }, .{ .expand = .ratio })) |r| {
                 var fw = try dvui.floatingMenu(@src(), dvui.Rect.fromPoint(dvui.Point{ .x = r.x, .y = r.y + r.h }), .{});
                 defer fw.deinit();
                 if (try dvui.menuItemLabel(@src(), "Add RSS", .{}, .{ .expand = .horizontal })) |_| {
@@ -768,10 +770,9 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
             });
             defer box.deinit();
 
-            const height = 8 + dvui.themeGet().font_body.lineHeight();
             if (delete_mode) {
                 if (try dvui.buttonIcon(@src(), "delete_podcast", dvui.entypo.trash, .{}, .{
-                    .min_size_content = .{ .h = height },
+                    .expand = .ratio,
                     .gravity_y = 0.5,
                 })) {
                     const num_episodes = (try dbRow(g_arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", u32, .{rowid})).?;
@@ -797,7 +798,7 @@ fn podcastSide(paned: *dvui.PanedWidget) !void {
                     m.w = 0;
                     margin.x = 0;
                     if (try dvui.buttonIcon(@src(), "cancel_refresh", dvui.entypo.circle_with_cross, .{}, .{
-                        .min_size_content = .{ .h = height },
+                        .expand = .ratio,
                         .rotation = std.math.pi * @as(f32, @floatFromInt(@mod(@divFloor(dvui.frameTimeNS(), 1_000_000), 1000))) / 1000,
                         .gravity_y = 0.5,
                     })) {
@@ -835,10 +836,10 @@ fn episodeSide(paned: *dvui.PanedWidget) !void {
     defer b.deinit();
 
     if (paned.collapsed()) {
-        var menu = try dvui.menu(@src(), .horizontal, .{ .expand = .horizontal });
+        var menu = try dvui.menu(@src(), .horizontal, .{ .expand = .horizontal, .min_size_content = .{ .h = top_bar_height } });
         defer menu.deinit();
 
-        if (try dvui.menuItemLabel(@src(), "Back", .{}, .{ .expand = .none })) |rr| {
+        if (try dvui.menuItemIcon(@src(), "back", dvui.entypo.chevron_left, .{}, .{ .expand = .ratio })) |rr| {
             _ = rr;
             paned.animateSplit(1.0);
         }
@@ -846,7 +847,7 @@ fn episodeSide(paned: *dvui.PanedWidget) !void {
 
     if (g_db) |*db| {
         const num_episodes = try dbRow(g_arena, "SELECT count(*) FROM episode WHERE podcast_id = ?", usize, .{g_podcast_id_on_right}) orelse 0;
-        const height: f32 = 150;
+        const height: f32 = 120;
 
         const tmpId = dvui.parentGet().extendId(@src(), 0);
         var scroll_info: dvui.ScrollInfo = .{ .vertical = .given };
@@ -938,23 +939,24 @@ fn episodeSide(paned: *dvui.PanedWidget) !void {
                 const epoch_day = epoch_secs.getEpochDay();
                 const year_day = epoch_day.calculateYearDay();
                 const month_day = year_day.calculateMonthDay();
-                try dvui.label(@src(), "{d}/{d}/{d}", .{ year_day.year % 1000, month_day.month.numeric(), month_day.day_index }, .{ .font_style = .heading });
+
+                try dvui.label(@src(), "{d}/{d}/{d}", .{ year_day.year % 1000, month_day.month.numeric(), month_day.day_index }, .{ .font_style = .caption_heading, .padding = .{} });
 
                 const hrs = @floor(episode.duration / 60.0 / 60.0);
                 const mins = @floor((episode.duration - (hrs * 60.0 * 60.0)) / 60.0);
                 const secs = @floor(episode.duration - (hrs * 60.0 * 60.0) - (mins * 60.0));
-                try dvui.label(@src(), "{d:0>2}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .font_style = .heading });
+                try dvui.label(@src(), "{d:0>2}:{d:0>2}:{d:0>2}", .{ hrs, mins, secs }, .{ .font_style = .caption_heading, .padding = .{} });
 
                 tbox.deinit();
 
                 tl.processEvents();
 
-                var f = dvui.themeGet().font_heading;
-                f.line_height_factor = 1.3;
-                try tl.format("{s}\n", .{episode.title}, .{ .font = f });
+                try tl.format("{s}", .{episode.title}, .{ .font = dvui.themeGet().font_heading.resize(15) });
+                try tl.addText("\n\n", .{ .font = dvui.themeGet().font_body.resize(8) });
+
                 //const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
                 //try tl.addText(lorem, .{});
-                try tl.addText(episode.description, .{});
+                try tl.addText(episode.description, .{ .font = dvui.themeGet().font_body.resize(14) });
             }
         }
     }
