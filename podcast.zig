@@ -512,6 +512,9 @@ fn mainGui() !void {
     }
 }
 
+var channel_str: []const u8 = "stereo";
+var spec_str: []const u8 = "s16";
+
 pub fn main() !void {
     var backend = try Backend.initWindow(.{
         .allocator = gpa,
@@ -544,17 +547,34 @@ pub fn main() !void {
         return error.BackendError;
     }
 
-    audio_spec.freq = 44100;
-    audio_spec.format = Backend.c.SDL_AUDIO_S16;
-    audio_spec.channels = 2;
-
-    audio_device = Backend.c.SDL_OpenAudioDeviceStream(Backend.c.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, audio_callback, null) orelse {
+    audio_device = Backend.c.SDL_OpenAudioDeviceStream(Backend.c.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, null, audio_callback, null) orelse {
         std.debug.print("SDL_OpenAudioDevice error: {s}\n", .{Backend.c.SDL_GetError()});
         return error.BackendError;
     };
     defer Backend.c.SDL_DestroyAudioStream(audio_device);
 
+    _ = Backend.c.SDL_GetAudioStreamFormat(audio_device, null, &audio_spec);
+
     std.debug.print("audio spec: {}\n", .{audio_spec});
+
+    channel_str = switch (audio_spec.channels) {
+        1 => "mono",
+        2 => "stereo",
+        else => {
+            std.debug.print("TODO: support {d} channel audio\n", .{audio_spec.channels});
+            return error.TOO_MANY_CHANNELS;
+        },
+    };
+
+    spec_str = switch (audio_spec.format) {
+        Backend.c.SDL_AUDIO_S16 => "s16",
+        else => {
+            std.debug.print("TODO: support {d} format audio\n", .{audio_spec.format});
+            return error.UNKNOWN_FORMAT;
+        },
+    };
+
+    std.debug.print("spec_str: {s} channel_str {s}\n", .{ spec_str, channel_str });
 
     const pt = try std.Thread.spawn(.{}, playback_thread, .{});
     pt.detach();
@@ -1145,7 +1165,7 @@ var audio_spec: Backend.c.SDL_AudioSpec = undefined;
 var playing = false;
 var stream_new = true;
 var stream_seek_time: ?f64 = null;
-var buffer = std.fifo.LinearFifo(u8, .{ .Static = 10 * std.math.pow(usize, 2, 20) }).init();
+var buffer = std.fifo.LinearFifo(u8, .{ .Static = 1 * std.math.pow(usize, 2, 19) }).init();
 var buffer_eof = false;
 var stream_timebase: f64 = 1.0;
 var buffer_last_time: f64 = 0;
@@ -1184,6 +1204,8 @@ fn pause() void {
     audio_mutex.lock();
 }
 
+//var sine_phase: usize = 0;
+
 // Locking: SDL locks the stream during audio_callback, and also locks it
 // inside SDL_PauseAudioStreamDevice/SDL_ResumeAudioStreamDevice.  So we'll
 // deadlock if play/pause is run (on a separate thread) while audio_callback is
@@ -1197,13 +1219,33 @@ export fn audio_callback(user_data: ?*anyopaque, stream: ?*Backend.c.SDL_AudioSt
     audio_mutex.lock();
     defer audio_mutex.unlock();
 
+    const size = @min(len - i, buffer.readableSlice(0).len);
+    //std.debug.print("callback {d} {d}\n", .{ len, size });
     while (i < len and buffer.readableLength() > 0) {
-        const size = @min(len - i, buffer.readableSlice(0).len);
+        //const endian = @import("builtin").cpu.arch.endian();
+
+        //var buf = g_arena.alloc(u8, size) catch unreachable;
+        //defer g_arena.free(buf);
+
+        //for (0..size / 4) |ii| {
+        //    const fval: f32 = 10000.0 * @sin(2.0 * std.math.pi * @as(f32, @floatFromInt(sine_phase + ii)) * 440 / @as(f32, @floatFromInt(audio_spec.freq)));
+        //    //std.debug.print("{d} ", .{fval});
+        //    const val: i16 = @intFromFloat(fval);
+        //    std.mem.writeInt(i16, buf[ii * 4 ..][0..2], val, endian);
+        //    std.mem.writeInt(i16, buf[ii * 4 + 2 ..][0..2], val, endian);
+        //}
+        //_ = Backend.c.SDL_PutAudioStreamData(stream.?, buf.ptr, @intCast(size));
+        //sine_phase += size / 4;
+
         _ = Backend.c.SDL_PutAudioStreamData(stream.?, buffer.readableSlice(0).ptr, @intCast(size));
         i += size;
-        //for (buffer.readableSlice(0)[0..size]) |s| {
-        //stream[i] = s;
-        //i += 1;
+        //for (0..size / 2) |ii| {
+        //    const val: i16 = std.mem.readInt(i16, buffer.readableSlice(0)[ii * 2 ..][0..2], endian);
+        //    if (val > 32700 or val < -32700) {
+        //        std.debug.print("audio {d}\n", .{val});
+        //    }
+        //    //stream[i] = s;
+        //    //i += 1;
         //}
         buffer.discard(size);
         current_time = buffer_last_time - (@as(f64, @floatFromInt(buffer.readableLength())) / @as(f64, @floatFromInt(audio_spec.freq * 2 * 2)));
@@ -1464,7 +1506,7 @@ fn playback_thread() !void {
                     inputs.?.next = null;
 
                     audio_mutex.lock();
-                    const filtergraph = try std.fmt.bufPrintZ(&buf, "aresample={d},aformat=sample_fmts={s}:channel_layouts={s},atempo={d}", .{ audio_spec.freq, "s16", "stereo", current_speed });
+                    const filtergraph = try std.fmt.bufPrintZ(&buf, "aresample={d},aformat=sample_fmts={s}:channel_layouts={s},atempo={d}", .{ audio_spec.freq, spec_str, channel_str, current_speed });
                     audio_mutex.unlock();
                     std.debug.print("filtergraph {s}\n", .{filtergraph});
 
