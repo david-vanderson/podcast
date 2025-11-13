@@ -1,26 +1,29 @@
 .{
-    .name = "podcast",
+    .name = .podcast,
+    .fingerprint = 0xd7e805bd4e05699e,
     .version = "0.0.1",
     .dependencies = .{
         .dvui = .{
-            .url = "https://github.com/david-vanderson/gui/archive/29e3a0b8e071b74656906b99bc1d2410e2eeecf5.tar.gz",
-            .hash = "122044e22bc953f8f4653110dcb702653bdd4d43c2284e2868d8ba7c3290dab2bdaf",
+            .path = "../dvui",
+            //.url = "https://github.com/david-vanderson/gui/archive/a605fc7eb4e92f76fd6d7cf7143d7a4137330bde.tar.gz",
+            //.hash = "dvui-0.4.0-dev-AQFJmcB91gAGVRax3uauPaa1Ub0YQNYXz_qFVYDMJ_uO",
         },
         .ffmpeg = .{
-            .url = "https://github.com/andrewrk/ffmpeg/archive/8836b829d3cfaf31ec7eaa15eeca84f065bcc423.tar.gz",
-            .hash = "1220b5d387335cb76a0eda4ab3e3c9ed153cbc3d1b5bb63c4899b5dfab3f826f4413",
-        },
-        .curl = .{
-            .url = "https://github.com/david-vanderson/curl/archive/598eb4b2f09ac897ce4516cb0643233c52a629f5.tar.gz",
-            .hash = "1220db05b237f76b76d8f382fe11b0e092a3a6927f5873d0aca0ab4450ce23801491",
+            .path = "../ffmpeg",
+            //.url = "git+https://github.com/allyourcodebase/ffmpeg?ref=main#7aef8a66ade3af7c29aa36f19932c0625ff0b751",
+            //.hash = "ffmpeg-7.0.1-7-zT7QA9p7CAQaSm6Kai-D5TAmr8nq48YI-gyTUhrDFbDK",
         },
         .libxml2 = .{
-            .url = "https://github.com/david-vanderson/libxml2/archive/92fb668b5c3d3928a80c87401b0858f968dd62d5.tar.gz",
-            .hash = "1220cfeaaa6b57ea468d047c69b482549cc09fe002c10d3cf1ec21e1f3e264443b9c",
+            .url = "git+https://github.com/david-vanderson/libxml2?ref=master#3792368fc0c28b04fab4b148d390e43cee9424e4",
+            .hash = "libxml2-2.10.0-dev-rNUYqjDGoAHdHdtN1kuZbmtFAcgW_X_u50VbFNr0Vmjo",
         },
         .sqlite = .{
-            .url = "https://github.com/vrischmann/zig-sqlite/archive/fd17eb9a4ea35f515cc7c2e4755a3a5e284a0bd3.tar.gz",
-            .hash = "1220e0300613f2b949a8328c5b1d9ba84777f2258c1535039afcb536e9e1228d2881",
+            .url = "git+https://github.com/vrischmann/zig-sqlite?ref=master#0b75ba276d34de3141ec1697e3ef7c836d7b38e7",
+            .hash = "sqlite-3.48.0-F2R_a8eODgD9X8XjvWlZ1K7C-tDuHae4FuShM2N-yIT2",
+        },
+        .libcurl = .{
+            .url = "git+https://github.com/david-vanderson/curl?ref=master#b1cf907c45cb199f3734d74090a7d13a9413cfd3",
+            .hash = "libcurl-7.88.1-crG7aa-HBwFV-7weYELf3M_h5r5Uje2rA53BLN9i6PEJ",
         },
     },
     .paths = .{""},
