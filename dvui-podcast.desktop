@@ -1,0 +1,10 @@
+# put this in .local/share/applications/
+[Desktop Entry]
+Name=Podcasts
+Comment=Listen to Podcasts
+Exec=env SDL_VIDEODRIVER=wayland WAYLAND_DISPLAY=wayland-0 /home/furios/podcast
+#Terminal=false
+Terminal=true
+X-MultipleArgs=false
+Type=Application
+StartupNotify=true
